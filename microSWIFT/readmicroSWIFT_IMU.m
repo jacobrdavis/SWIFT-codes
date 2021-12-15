@@ -9,7 +9,8 @@ function IMU = readmicroSWIFT_IMU(filename, plotflag)
 %       gyroX(deg/s), gyroY(deg/s), gyroZ(deg/s), 
 % 
 % J. Thomson,  7/2020
-%               5/2021 covert timestamps to datenums
+%               5/2021 covert timestamps to datenums (J. Thomson)
+%               12/2021 speed up datenum conversion (J. Davis)
 
 data = importdata(filename);
 
@@ -20,9 +21,8 @@ IMU.gyro = data.data(:,7:9);
 %IMU.angles = data.data(:,10:12);  % removed in fall 2020
 
 %% timestamps
-for i=1:length(IMU.clock), 
-    IMU.time(i) = datenum(IMU.clock(i));
-end
+IMU.time= datenum(IMU.clock); % modified 12/2021
+
 
 %% plots
 
