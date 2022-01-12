@@ -9,7 +9,8 @@ function IMU = readmicroSWIFT_IMU(filename, plotflag)
 %       gyroX(deg/s), gyroY(deg/s), gyroZ(deg/s), 
 % 
 % J. Thomson,  7/2020
-%               5/2021 covert timestamps to datenums
+%               5/2021 covert timestamps to datenums (J. Thomson)
+%               12/2021 speed up datenum conversion (J. Davis)
 
 data = importdata(filename);
 
