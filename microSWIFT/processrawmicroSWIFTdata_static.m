@@ -9,18 +9,8 @@
 %   Mapping Toolbox (deg2km)
 
 %% Settings and inputs:
-% runs to do: body frame XYZwaves, GPSwaves, GPSandIMUwaves
-                    % RC@0.4 and Dynamic cutoff? ...maybe not
-% XYZwaves - RC done!
-% XYZwaves - bwdyn done!
-% GPSwaves - RC done!
-% GPSwaves - bwdyn done!
-% GPSandIMUWaves - RC
-% GPSandIMUWaves - bwdyn
-
-% dataDir   = '/Users/jacob/Dropbox/Projects/microSWIFT/onboard_development/data/StaticMobileBay/';
-% dataDir  = '/Users/jacob/Dropbox/Projects/microSWIFT/onboard_development/data/DuckFRF/microSWIFT002/';
-dataDir = '/Users/jacob/Dropbox/Projects/microSWIFT/onboard_development/data/Benchtop_2021-03-14/';
+dataDir   = '/Users/jacob/Dropbox/Projects/microSWIFT/onboard_development/data/StaticMobileBay/';
+% dataDir  = '/Users/jacob/Dropbox/Projects/microSWIFT/onboard_development/data/DuckFRF/microSWIFT014/';
 outputDir = '/Users/jacob/Dropbox/Projects/microSWIFT/onboard_development/';
 
 %% GPS processing
@@ -42,48 +32,46 @@ clear gi;
 % Methods
 referenceFrame = 'body';
 filterType = 'RC';%'butterworth_dynamic'; %'butterworth_highpass'; %'RC_dynamic'; %'butterworth_highpass'
-detrendSignals = true; 
+detrendSignals = true;
 
-% Obtain IMU file list from specified data directory:
+% Obtain IMU file list from speciSfied data directory:
 IMUflist = dir([dataDir,'*IMU*.dat']);
 
 % Initialize IMU structure array:
 clear IMU; IMU(length(IMUflist)) = processmicroSWIFT_IMU([],referenceFrame); 
 
 % Process bursts:
+
 for ii = 1:length(IMUflist)
     disp(['IMU file ' num2str(ii) ' of ' num2str(length(IMUflist))])
-    if strcmp(filterType,'butterworth_dynamic')
-        fc = dynamicFilterCutoff(sqrt(GPS(ii).u.^2+GPS(ii).v.^2),GPS(ii).samplingrate,0.70,true);
-        [IMU(ii),filterFunc] = processmicroSWIFT_IMU(fullfile(IMUflist(ii).folder,IMUflist(ii).name),referenceFrame,filterType,detrendSignals,fc);
-        
-        GPS(ii).x = filterFunc(GPS(ii).x);
-        GPS(ii).y = filterFunc(GPS(ii).y);
-        GPS(ii).u = filterFunc(GPS(ii).u);
-        GPS(ii).v = filterFunc(GPS(ii).v);
-        disp('dyn')
+
+    close all
+
+    IMU(ii) = processmicroSWIFT_IMU(fullfile(IMUflist(ii).folder,IMUflist(ii).name),referenceFrame,filterType,detrendSignals);
+
+    figHandles = findobj('Type', 'figure');
+%     figHandles = figHandles(end-2:end);
+    id = extract(IMUflist(ii).name,"microSWIFT"+digitsPattern(3));
+    time = datetime(median(IMU(ii).time),'ConvertFrom','datenum'); 
+    filenamedate = datestr(time); filenamedate = strrep(strrep(filenamedate(1:end-3),':',''),' ','_');
+
+    if detrendSignals == false
+        detrendChar = 'no_detrending';
     else
-        [IMU(ii),filterFunc] = processmicroSWIFT_IMU(fullfile(IMUflist(ii).folder,IMUflist(ii).name),referenceFrame,filterType,detrendSignals);
-        disp('not dyn')
-
-        GPS(ii).x = filterFunc(GPS(ii).x);
-        GPS(ii).y = filterFunc(GPS(ii).y);
-        GPS(ii).u = filterFunc(GPS(ii).u);
-        GPS(ii).v = filterFunc(GPS(ii).v);
-
+        detrendChar = '';
     end
+
+    filenameStr = ['StaticMobileBay_',referenceFrame,'_',filterType,'_',detrendChar,'_',char(id),'_',filenamedate];
+%     print([char(outputDir),'figures/',char(filenameStr),'.png'],'-dpng')   
+
+    labelnames = flip({'acceleration','velocity','position'});
+    for f = 1:3
+        cf = figHandles(f);
+        print(figHandles(f),[char(outputDir),'figures/',char(filenameStr),'_',labelnames{f},'.png'],'-dpng')
+    end
+    ;
 end 
 clear ii
-%%
-figure
-plot(IMU.time,IMU.acc(:,2:3))
-
-figure
-plot(IMU.time,IMU.pos(:,2:3))
-
-%%
-figure
-plot(IMU.time,IMU.gyro)
 
 %% Collation and interpolation onto master clock
 for i = 1:length(IMU) 
@@ -93,56 +81,31 @@ end
 %% Wave processing
 for i = 1:length(IMU)
     id = extract(IMUflist(i).name,"microSWIFT"+digitsPattern(3));
-% XYZwaves:
-%     x  = GPS(i).x;
-%     y  = GPS(i).y;
-%     z  = IMU(i).pos(:,3);
-%     fs = round(IMU(i).samplingrate);
-%     method = @() XYZwaves_microSWIFT(x,y,z,fs);
-
-% GPSwaves:
-%     u  = GPS(i).u;
-%     v  = GPS(i).v;
-%     z  = GPS(i).z;
-%     fs = round(IMU(i).samplingrate);
-%     method = @() GPSwaves_microswift(u,v,z,fs);
-
-% GPSandIMUwaves:
-    u  = GPS(i).u;
-    v  = GPS(i).v;
+    x  = GPS(i).x;
+    y  = GPS(i).y;
     z  = IMU(i).pos(:,3);
     fs = round(IMU(i).samplingrate);
-    method = @() GPSandIMUwaves_microswift(u,v,z,fs);
+    method = @() XYZwaves_microSWIFT(x,y,z,fs);
     SWIFT(i) = processWaves(method,initSWIFT(IMU(i),GPS(i),id));
 end
 %%
-% figure; hold on
-% for i = 1:length(SWIFT)
-% plot(SWIFT(i).wavespectra.freq,SWIFT(i).wavespectra.energy,'color',0.6*[1 1 1])
-% set(gca,'YScale','log','XScale','log')
-% %     legend('Location','northeast')
-%     xlabel('frequency (Hz)')
-%     ylabel('Energy density (m^2/Hz)')
-% end
-% plot([0.01 0.5],10^(-8).*[0.01 0.5].^(-4),'k','LineWidth',2)
-% set(gca,'FontSize',14)
-% 
-% figure
-% [Ez,fz] = pwelch(IMU(3).pos(:,3),[],[],[],fs);
-% [Ex,fx] = pwelch(GPS(3).x,[],[],[],fs);
-% [Ey,fy] = pwelch(GPS(3).y,[],[],[],fs);
-% plot(f,E,'color',0.6*[1 1 1]); hold on
-% plot(f,Ex+Ey,'color',0*[1 1 1])
-% set(gca,'YScale','log','XScale','log')
-%     xlabel('frequency (Hz)')
-%     ylabel('Energy density (m^2/Hz)')
+figure; hold on
+for i = 1:length(SWIFT)
+plot(SWIFT(i).wavespectra.freq,SWIFT(i).wavespectra.energy,'color',0.6*[1 1 1])
+set(gca,'YScale','log','XScale','log')
+%     legend('Location','northeast')
+    xlabel('frequency (Hz)')
+    ylabel('Energy density (m^2/Hz)')
+end
+plot([0.01 0.5],10^(-8).*[0.01 0.5].^(-4),'k','LineWidth',2)
+set(gca,'FontSize',14)
 
 %% Evaluation
 load('/Users/jacob/Dropbox/Projects/microSWIFT/onboard_development/data/DuckFRF/CDIP/CDIP192_Oct2021.mat')
 load('/Users/jacob/Dropbox/Projects/microSWIFT/onboard_development/data/DuckFRF/CDIP/CDIP433_Oct2021.mat')
 
 figureVisibility = 'off';
-printFigures = true;
+printFigures = false;
 
 for i = 1:length(SWIFT)
     if day(SWIFT(i).time) == 26
@@ -153,21 +116,22 @@ for i = 1:length(SWIFT)
 
     [~,j]=min(abs([CDIP.time] - SWIFT(i).time));
     SWIFT(i).metrics= compute_evaluation_metrics(SWIFT(i),CDIP(j),initMetrics(func2str(method),referenceFrame,filterType,IMU(i).cutoff),outputDir,figureVisibility,printFigures);
-    
+   
+%     OUTPUT TABLE? maybe not mat is sufficient
 %     in another file, plot RMSE as a function of dataset for each method (load in files)
 end
 
-
+figure; hold on
+for i = 1:length(SWIFT)
+    scatter(SWIFT(i).metrics.benchmarkTime,SWIFT(i).metrics.spectral.energy('RMSE_total'))
+end
 %% Save
-% figure; hold on
-% for i = 1:length(SWIFT)
-%     scatter(SWIFT(i).metrics.benchmarkTime,SWIFT(i).metrics.spectral.energy('RMSE_total'))
-% end
-% summary plot of RMSE for each method for every buoy (or combine buoys)!
+
+summary plot of RMSE for each method for every buoy (or combine buoys)!
 
 filenameStr = join([SWIFT(1).metrics.method,SWIFT(1).metrics.referenceFrame,SWIFT(1).metrics.filterType,SWIFT(1).id],'_'); % [char(method),'_',char(SWIFT.id),'_',char(CDIP.id),'_',filenamedate]
 save([outputDir,'matfiles/',char(filenameStr),'.mat'],'SWIFT')
-;
+
 %%
 function [SWIFT] = initSWIFT(IMU,GPS,id)
    SWIFT.id = id;

@@ -28,7 +28,7 @@ function [GPS] = processmicroSWIFT_GPS(GPSfile)
 %   SWIFT-codes (readNMEA)
 %   Mapping Toolbox (deg2km)
 %
-% J. Davis 2021-01-05
+% J. Davis 2022-01-05
 % adapted from <explorerawmicroSWIFTdata.m script by J. Thomson, 10/2020
 %%
 
@@ -57,6 +57,9 @@ if exist('GPSfile','var') && isfile(GPSfile)
     
     % approximate sample rate:
     GPS.samplingrate = length(GPS.time)./((max(GPS.time)-min(GPS.time))*24*3600); % Hz
+
+%     % Record mean time of the current burst
+%     GPS.meanBurstTime = datetime(mean(GPS.time),'ConvertFrom','datenum');
 
 else % if conditions are not satisfied, report an empty structure (also useful for initialization)
     

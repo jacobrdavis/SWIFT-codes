@@ -1,0 +1,121 @@
+{\rtf1\ansi\ansicpg1252\cocoartf2580
+\cocoatextscaling0\cocoaplatform0{\fonttbl\f0\fmodern\fcharset0 Courier;}
+{\colortbl;\red255\green255\blue255;\red2\green128\blue9;}
+{\*\expandedcolortbl;;\csgenericrgb\c784\c50196\c3529;}
+{\info
+{\author Jacob Davis}}\margl1440\margr1440\vieww13880\viewh8400\viewkind0
+\pard\tx560\tx1120\tx1680\tx2240\tx2800\tx3360\tx3920\tx4480\tx5040\tx5600\tx6160\tx6720\pardirnatural\partightenfactor0
+
+\f0\fs20 \cf2 %% scraps\
+\
+% for gi = 1:length(GPSflist)\
+%         matfile = dir([GPSflist(gi).name(1:end-4) '.mat']);\
+%        if readraw | isempty(matfile)\
+%         disp(['GPS file ' num2str(gi) ' of ' num2str(length(GPSflist))])\
+%        GPS(gi) = processmicroSWIFT_GPS(fullfile(GPSflist(gi).folder,GPSflist(gi).name));\
+%             save([GPSflist(gi).name(1:end-4)],'GPS')\
+%             save([GPSflist(gi).name(1:end-4) '.mat'],'GPS','GPSsamplingrate');\
+%             save([GPSflist(end).name(1:13) '_' GPSflist(end).name(19:27) '_results'],'GPSresults');\
+%        else\
+%             load([GPSflist(gi).name(1:end-4) '.mat']);\
+%             disp('loading existing mat file')\
+%        end\
+% end\
+\
+% for ii = 1:length(IMUflist)\
+%     disp(['IMU file ' num2str(ii) ' of ' num2str(length(IMUflist))])\
+%    matfile = dir([IMUflist(ii).name(1:end-4) '.mat']);\
+%    if readraw | isempty(matfile)\
+%       \
+%     IMU(ii) = processmicroSWIFT_IMU(fullfile(IMUflist(ii).folder,IMUflist(ii).name),'body');\
+%      \
+\cf0     \cf2 %         save([IMUflist(ii).name(1:end-4) '.mat'],'IMU*')\
+%     else\
+%         load([IMUflist(ii).name(1:end-4) '.mat']) % load(matfile)?\
+%         disp('loading existing mat file')\
+%     end\
+% end\
+\
+\
+\
+% fc = 0.1;\
+% fs = 12;\
+% [b,a] = butter(2,fc/(fs/2),'high');\
+% freqz(b,a)\
+% \
+% % build the filter:\
+% [h_filt,f_filt] = freqz(b,a,f,fs);\
+% [h_filt,f_filt] = freqz(b,a,length(f),'whole');\
+% h_ma_filt = abs(h_filt);\
+% h_ph_filt = unwrap(angle(h_filt))*180/pi;\
+% \
+% % perform the filtering\
+% E_filt = filtfilt(b,a,E); % filtfilt neccessary for zero-phase filtering\
+% \
+% E_filt = E.*h_filt.';\
+% \
+% \
+% figure\
+% subplot(2,1,1)\
+% plot(f,E); hold on\
+% plot(f,E_filt)\
+% set(gca, 'YScale', 'log'); set(gca, 'XScale', 'log')\
+% % xlim([min(f),max(f)])\
+% \
+% subplot(2,1,2)\
+% yyaxis left\
+% semilogx(f_filt,mag2db(h_ma_filt),'DisplayName','Ma','LineWidth',2); hold on\
+% ylabel('Magnitude (dB)')\
+% yyaxis right\
+% semilogx(f_filt,h_ph_filt,'DisplayName','Ph','LineWidth',2);\
+% xlabel('f(Hz)')\
+% ylabel('Phase (deg)')\
+% legend()\
+% xlim([min(f),max(f)])\
+\
+\
+%% Plot\
+% f = SWIFT(1).wavespectra.freq;\
+% E = SWIFT(1).wavespectra.energy;\
+% \
+% figure\
+% plot(f,E); hold on\
+% set(gca, 'YScale', 'log')\
+% set(gca, 'XScale', 'log')\
+% noiseFloor.E = E;\
+% noiseFloor.f = f;\
+% save('noiseFloor.mat','noiseFloor')\
+%%\
+% \
+% figure\
+% plot(GPS(4).time,GPS(4).u,'DisplayName','GPS'); hold on\
+% plot(IMU(4).time,IMU(4).vel(:,1),'DisplayName','IMU')\
+% legend()\
+% \
+% %%\
+% % # TODO: apply filter over entire frequency range\
+% \
+% load('/Users/jacob/Dropbox/Projects/microSWIFT/filter_design/data/duckFRF/CDIP/CDIP433_Oct2021.mat')\
+% \
+% humantime = datetime([CDIP433.time],'ConvertFrom','datenum');\
+% idx = find(humantime == datetime(2021,10,26,16,30,00));\
+% \
+% f_CDIP = CDIP433(idx).wavespectra.freq;\
+% E_CDIP = CDIP433(idx).wavespectra.energy;\
+% \
+% f = SWIFT(1).wavespectra.freq;\
+% E = SWIFT(1).wavespectra.energy;\
+% % E2 = E - noiseFloor.E;\
+% \
+% [E2,f2] = pwelch(IMU(1).pos(:,3),[],[],[],fs);\
+% \
+% figure\
+% plot(f,E); hold on\
+% % plot(f,E2)\
+% plot(f_CDIP,E_CDIP)\
+% plot(f2,E2)\
+% % plot(noiseFloor.f,noiseFloor.E)\
+% set(gca, 'YScale', 'log')\
+% set(gca, 'XScale', 'log')\
+\
+}

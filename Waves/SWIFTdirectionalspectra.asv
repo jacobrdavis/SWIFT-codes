@@ -147,7 +147,7 @@ if iscolumn(f),
     [h,c] = polarPcolorV3(f',theta(1:180),log10(Etheta(:,1:180)'),'colBar',true,'colormap',getPyPlot_cMap('RdGy_r'));
     set(get(c,'Label'),'string','Energy (m^2s)');
     set(gca,'FontSize',18)
-    ticklabels = cellfun(@(x) ['10^{',x,'}'],c.TickLabels,'UniformOutput',false);
+    ticklabels = cellfun(@(x) ['10^{',x,'}'],c.TickLabels,'UniformOutput',false)
     set(c,'TickLabels',ticklabels)
 
    ;

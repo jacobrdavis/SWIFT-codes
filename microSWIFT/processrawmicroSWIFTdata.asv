@@ -74,16 +74,6 @@ for ii = 1:length(IMUflist)
     end
 end 
 clear ii
-%%
-figure
-plot(IMU.time,IMU.acc(:,2:3))
-
-figure
-plot(IMU.time,IMU.pos(:,2:3))
-
-%%
-figure
-plot(IMU.time,IMU.gyro)
 
 %% Collation and interpolation onto master clock
 for i = 1:length(IMU) 

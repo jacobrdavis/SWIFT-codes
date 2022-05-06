@@ -1,4 +1,4 @@
-function [IMU] = processmicroSWIFT_IMU(IMUfile,referenceFrame)
+function [IMU,filterFunc] = processmicroSWIFT_IMU(IMUfile,referenceFrame,filterType,detrendSignals,fc)
 %% processmicroSWIFT_IMU.m
 % Function to process microSWIFT IMU data, in the form of a <.dat> file, 
 % for a single recording burst.
@@ -40,12 +40,12 @@ function [IMU] = processmicroSWIFT_IMU(IMUfile,referenceFrame)
 % Dependencies: 
 %   SWIFT-codes (readmicroSWIFT_IMU)
 %
-% J. Davis 2021-01-05
+% J. Davis 2022-01-05
 % adapted from <explorerawmicroSWIFTdata.m script by J. Thomson, 10/2020
 %%
 
 % checks
-if exist('IMUfile','var') && isfile(IMUfile) % && IMUfile.bytes > 0
+if exist('IMUfile','var') && ~isempty(IMUfile) && isfile(IMUfile) % && IMUfile.bytes > 0
     
     % read raw IMU files:
     IMU = readmicroSWIFT_IMU(IMUfile, false);
@@ -59,9 +59,12 @@ if exist('IMUfile','var') && isfile(IMUfile) % && IMUfile.bytes > 0
 
     % Compute sample rate:
     IMU.samplingrate = length(IMU.acc)./((max(IMU.time)-min(IMU.time))*24*3600); % usually 12 Hz
-    
+   
     % Sort IMU onto master clock
     [IMU] = sortIMU(IMU);
+    
+%     % Record mean time of the current burst
+%     IMU.meanBurstTime = datetime(mean(IMU.time),'ConvertFrom','datenum');
 
     % Integrate to position
     switch referenceFrame
@@ -71,188 +74,31 @@ if exist('IMUfile','var') && isfile(IMUfile) % && IMUfile.bytes > 0
         Wd = .5;  % weighting in complimentary filter, 0 to 1
 
         % call IMUtoXYZ
-        [IMU.x, IMU.y, IMU.z, IMU.roll, IMU.pitch, IMU.yaw, IMU.heading] = ...
-            IMUtoXYZ(IMU.acc(:,1), IMU.acc(:,2), IMU.acc(:,3), IMU.gyro(:,1), IMU.gyro(:,2), ...
-            IMU.gyro(:,3), IMU.mag(:,1), IMU.mag(:,2), IMU.mag(:,3), mxo, myo, mzo, Wd, IMUsamplingrate);
+        [x,y,z,vx,vy,vz,roll,pitch,yaw,heading] = ...
+        IMUtoXYZ(IMU.acc(:,1), IMU.acc(:,2), IMU.acc(:,3), IMU.gyro(:,1), IMU.gyro(:,2), ...
+            IMU.gyro(:,3), IMU.mag(:,1), IMU.mag(:,2), IMU.mag(:,3), mxo, myo, mzo, Wd, IMU.samplingrate);
+        
+        IMU.pos = [x y z];
+        IMU.vel = [vx vy vz];
+        IMU.angles = [roll pitch yaw];
+        IMU.heading = heading;
 
         case 'body'
-        RC = 4;  % high pass RC filter constant, T > (2 * pi * RC)
-        [IMU] = IMUtoXYZbody(IMU,RC);
+        
+        if ~exist('fc',"var")
+            fc = [];
+        end
+
+        [IMU,filterFunc] = IMUtoXYZbody(IMU,filterType,detrendSignals,fc);
 
     end
 else % if conditions are not satisfied, report an empty structure (also useful for initialization)
-    
-    IMU = struct('clock',[],'acc',[],'mag',[],'gyro',[],'time',[],'samplingrate',[],'pos',[]); % [],'z',[],'u',[],'v',[],'x',[],'y',[]
-
+    switch referenceFrame
+        case 'earth'
+            IMU = struct('clock',[],'acc',[],'mag',[],'gyro',[],'time',[],'samplingrate',[],'pos',[],'vel',[],'angles',[],'heading',[]); % [],'z',[],'u',[],'v',[],'x',[],'y',[]
+        case 'body'
+            IMU = struct('clock',[],'acc',[],'mag',[],'gyro',[],'time',[],'samplingrate',[],'cutoff',[],'pos',[],'vel',[]); % [],'z',[],'u',[],'v',[],'x',[],'y',[]
+    end
 end
 
-end
-
-function [IMU] = IMUtoXYZbody(IMU,RC)
-% filter and integrate linear accelerations to get linear velocities
-ax = IMU.acc(:,1);
-ay = IMU.acc(:,2);
-az = IMU.acc(:,3);
-t  = IMU.time;
-fs = IMU.samplingrate;
-dt = fs^(-1);
-
-ax = detrend(ax);
-ay = detrend(ay);
-az = detrend(az);
-
-axf = RCfilter(ax, RC, fs);
-ayf = RCfilter(ay, RC, fs);
-azf = RCfilter(az, RC, fs);
-
-% figure(); 
-% subplot(3,1,1)
-%     plot(t,ax,'color','b','DisplayName','unfiltered'); hold on
-%     plot(t,axf,'color','r','DisplayName','filtered')
-%     ylabel('ax (m/s)')
-%     legend()
-% subplot(3,1,2)
-%     plot(t,ay,'color','b') ; hold on
-%     plot(t,ayf,'color','r')
-%     ylabel('ay (m/s)')
-% subplot(3,1,3)
-%     plot(t,az,'color','b') ; hold on
-%     plot(t,azf,'color','r')
-%     ylabel('az (m/s)')
-% 
-% figure;
-% [f,Ma,~] = pltFFT(az,fs);
-% semilogx(f,Ma,'color','b'); hold on 
-% [f,Ma,~] = pltFFT(azf,fs);
-% semilogx(f,Ma,'color','r'); hold on 
-% xline(0.05,'LineWidth',1.5); xline(0.5,'LineWidth',1.5); 
-% xline(1/(2*pi*RC),'LineWidth',1.5,'color','r')
-% xlabel('f (Hz)')
-% ylabel('FFT(az) (m/s^2)')
-
-vx = cumtrapz(axf)*dt; % m/s
-vy = cumtrapz(ayf)*dt; % m/s
-vz = cumtrapz(azf)*dt; % m/s
-
-vx = detrend(vx,'omitnan');
-vy = detrend(vy,'omitnan');
-vz = detrend(vz,'omitnan');
-
-vxf = RCfilter(vx, RC, fs);
-vyf = RCfilter(vy, RC, fs);
-vzf = RCfilter(vz, RC, fs);
-
-% figure(); 
-% subplot(3,1,1)
-%     plot(t,vx,'color','b','DisplayName','unfiltered'); hold on
-%     plot(t,vxf,'color','r','DisplayName','filtered')
-%     ylabel('vx (m/s)')
-%     legend()
-% subplot(3,1,2)
-%     plot(t,vy,'color','b') ; hold on
-%     plot(t,vyf,'color','r')
-%     ylabel('vy (m/s)')
-% subplot(3,1,3)
-%     plot(t,vz,'color','b') ; hold on
-%     plot(t,vzf,'color','r')
-%     ylabel('vz (m/s)')
-% 
-% figure;
-% [f,Ma,~] = pltFFT(vz,fs);
-% semilogx(f,Ma,'color','b'); hold on 
-% [f,Ma,~] = pltFFT(vzf,fs);
-% semilogx(f,Ma,'color','r'); hold on 
-% xline(0.05); xline(0.5); 
-% xline(1/(2*pi*RC),'color','r')
-% xlabel('f (Hz)')
-% ylabel('FFT(vz) (m/s)')
-
-x = cumtrapz(vxf)*dt;
-y = cumtrapz(vyf)*dt;
-z = cumtrapz(vzf)*dt;
-
-x = detrend(x,'omitnan');
-y = detrend(y,'omitnan');
-z = detrend(z,'omitnan');
-
-xf = RCfilter(x, RC, fs);
-yf = RCfilter(y, RC, fs);
-zf = RCfilter(z, RC, fs);
-% 
-% figure(); 
-% subplot(3,1,1)
-%     plot(t,x,'color','b','DisplayName','unfiltered'); hold on
-%     plot(t,xf,'color','r','DisplayName','filtered')
-%     ylabel('x (m)')
-%     legend()
-% subplot(3,1,2)
-%     plot(t,y,'color','b') ; hold on
-%     plot(t,yf,'color','r')
-%     ylabel('y (m)')
-% subplot(3,1,3)
-%     plot(t,z,'color','b') ; hold on
-%     plot(t,zf,'color','r')
-%     ylabel('z (m)')
-% 
-% figure;
-% [f,Ma,~] = pltFFT(z,fs);
-% semilogx(f,Ma,'color','b'); hold on 
-% [f,Ma,~] = pltFFT(zf,fs);
-% semilogx(f,Ma,'color','r'); hold on 
-% xline(0.05); xline(0.5); 
-% xline(1/(2*pi*RC),'color','r')
-% xlabel('f (Hz)')
-% ylabel('FFT(z) (m)')
-
-% remove first portion, which can has initial oscillations from filtering
-xf(1:round(RC./dt*10),:) = 0;
-yf(1:round(RC./dt*10),:) = 0;
-zf(1:round(RC./dt*10),:) = 0;
-
-
-
-% figure()
-% subplot(3,1,1)
-%     plot(t,xf)
-%     ylabel('x (m)')
-% subplot(3,1,2)
-%     plot(t,yf)
-%     ylabel('y (m)')
-% subplot(3,1,3)
-%     plot(t,zf)
-%     ylabel('z (m)')
-% drawnow
-
-IMU.pos = [xf yf zf];
-
-end
-
-%% EMBEDDED RC FILTER function (high pass filter) %%
-function a = RCfilter(b, RC, fs)
-
-alpha = RC / (RC + 1./fs);
-a = b;
-
-for ui = 2:length(b)
-    a(ui) = alpha * a(ui-1) + alpha * ( b(ui) - b(ui-1) );
-end
-
-end
-
-
-function [f,Ma,Ph] = pltFFT(y,fs)
-Y = fft(y);
-L = length(y);
-
-% magnitude
-Ma2 = abs(Y/L);
-Ma = Ma2(1:round(L/2+1));
-Ma(2:end-1) = 2*Ma(2:end-1);
-
-% phase
-Ph2 = angle(Y);
-Ph = Ph2(1:round(L/2+1));
-
-% frequency
-f = fs*(0:round(L/2))/L;
 end

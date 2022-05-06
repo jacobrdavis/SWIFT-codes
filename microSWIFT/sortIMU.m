@@ -20,11 +20,29 @@ function [IMU] = sortIMU(IMU)
 
 %% Sort IMU onto master clock
 
+% uv = unique(IMU.time);
+% cnts  = histc(IMU.time,uv);
+% 
+% figure
+% histogram(cnts)
+% xlabel('measurements/second')
+% ylabel('count')
+
 % Convert to datetime format with ms accuracy; prevents rounding problems
 IMU.time = datetime(IMU.time,'ConvertFrom','datenum','Format','yyyy-MM-dd HH:mm:ss.SSS');
 
 % Extract rounded sample rate and start-stop times
 fs = round(IMU.samplingrate);
+
+sortedTime = sort(IMU.time);
+if ~isequal(sortedTime,IMU.time)
+    unsortedIndices = find((IMU.time - sortedTime) ~= 0);
+    disp(['sorting errors detected at lines: ',num2str(unsortedIndices.')])
+    IMU.time = sortedTime;
+    clear sortedTime unsortedIndices
+end
+
+
 t0 = IMU.time(1);
 tf = IMU.time(end);
 
