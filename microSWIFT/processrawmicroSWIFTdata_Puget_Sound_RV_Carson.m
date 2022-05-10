@@ -9,7 +9,7 @@
 %   Mapping Toolbox (deg2km)
 
 %% Settings and inputs:
-dataDir = '/Users/jacob/Dropbox/Projects/microSWIFT/onboard_development/data/2022-05-05_Puget_Sound_RV_Carson/';
+dataDir = '/Users/jacob/Dropbox/Projects/microSWIFT/onboard_development/data/2022-05-05_Puget_Sound_RV_Carson/V2microSWIFT043/';
 outputDir = '/Users/jacob/Dropbox/Projects/microSWIFT/onboard_development/';
 
 mSWIFTlabels = {'microSWIFT043 V2'};
@@ -56,6 +56,77 @@ for ii = 1:length(IMUflist)
     
 end  
 clear ii
+
+%% Heave estimator
+
+ [f,Y,Ma,Ph] = fast_fourier_transform(IMU.acc(:,1),IMU.samplingrate);
+
+ figure
+ plot(f,Ma)
+ xlabel('frequency (Hz)')
+ ylabel('amplitude (m)')
+ set(gca,'YScale','log'); set(gca,'XScale','log')
+ set(gca,'FontSize',14)
+
+f2 = transpose([-flip(f(2:end)) f(2:end)]);
+
+s = 1i*2*pi*f2;
+zeta = 1/sqrt(2);
+wc = 2*pi*0.05;
+% wc = 0.05;
+H_heave_estimator = s.^2 ./ (s.^2 +2*zeta*wc*s + wc^2).^2;
+Phat = Y.*H_heave_estimator;
+phat = ifft(Phat);
+
+
+Fs = IMU.samplingrate;                                          % Define Sampling Frequency
+Ts = 1/Fs;
+z = tf('z',Ts);
+H = z^2/(z^2 + 2*zeta*wc*z + wc^2)^2;
+H = z^2/(z^4 + z^3*(4*zeta*wc) + z^2*(2*wc^2 + 4*zeta^2*wc^2) + z*(4*zeta*wc^3) + wc^4);
+
+Num = H.Numerator
+Den = H.Denominator
+figure
+freqz(Num{:}, Den{:})
+
+
+
+bodeplot(Num{:},Den{:})
+
+
+sys = tf([1 0 0],...
+         [1 (4*zeta*wc) (2*wc^2 + 4*zeta^2*wc^2)  (4*zeta*wc^3) +wc^4])
+
+sysd = c2d(sys,Ts)
+
+
+hplt = bodeplot(sysd)
+setoptions(hplt,'FreqUnits','Hz')
+% filtfilt(sysd.Numerator{:},sysd.Denominator{:},)
+% 
+phat = filter(sysd.Numerator{:},sysd.Denominator{:}, detrend(IMU.acc(:,1)));
+
+figure
+plot(IMU.time,phat)
+
+[E,f] = pwelch(phat,[],[],[],Fs);
+
+figure
+plot(f,E)
+xlabel('frequency (Hz)')
+ylabel('energy (m^2/Hz)')
+set(gca,'YScale','log'); 
+set(gca,'FontSize',14)
+
+sys = s^2/(s^2 + 2*zeta*wc*s + wc^2)^2;
+
+figure; hold on
+plot(IMU.time,IMU.acc(:,1),'-')
+plot(IMU.time,yhat,'--')
+
+figure; hold on
+plot(IMU.time,phat)
 %% time series plots
 
 % plot 1: vertical accelerations (HERE IT IS x)
@@ -192,6 +263,9 @@ for m = 1:length(methodNames)
 
     end
 end
+
+plot(f,E)
+
 legend(h, [methodNames,mSWIFTlabels]);
 xlabel('frequency (Hz)')
 ylabel('Energy density (m^2/Hz)')
