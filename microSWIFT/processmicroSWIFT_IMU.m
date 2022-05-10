@@ -75,8 +75,8 @@ if exist('IMUfile','var') && ~isempty(IMUfile) && isfile(IMUfile) % && IMUfile.b
 
         % call IMUtoXYZ
         [x,y,z,vx,vy,vz,roll,pitch,yaw,heading] = ...
-        IMUtoXYZ(IMU.acc(:,1), IMU.acc(:,2), IMU.acc(:,3), IMU.gyro(:,1), IMU.gyro(:,2), ...
-            IMU.gyro(:,3), IMU.mag(:,1), IMU.mag(:,2), IMU.mag(:,3), mxo, myo, mzo, Wd, IMU.samplingrate);
+        IMUtoXYZ(-IMU.acc(:,3), IMU.acc(:,2), IMU.acc(:,1), -IMU.gyro(:,3), IMU.gyro(:,2), ...
+            IMU.gyro(:,1), -IMU.mag(:,3), IMU.mag(:,2), IMU.mag(:,1), mxo, myo, mzo, Wd, IMU.samplingrate);
         
         IMU.pos = [x y z];
         IMU.vel = [vx vy vz];
