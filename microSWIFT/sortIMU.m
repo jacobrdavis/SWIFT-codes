@@ -72,6 +72,14 @@ nonNaN = ~isnan(IMU.acc(:,1))  & ~isnan(IMU.acc(:,2))  & ~isnan(IMU.acc(:,3)) & 
 
 IMU = cropStructFields(IMU,nonNaN);
 
+%% Trim
+disp('TODO: trimming to be performed in sortIMU line 76')
+% figure
+% plot(masterTime, IMU.acc)
+% 
+% IMU = cropStructFields(IMU,nonNaN);
+
+
 end
 
 %% Subfunctions

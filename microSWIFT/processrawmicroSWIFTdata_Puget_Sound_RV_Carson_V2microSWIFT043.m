@@ -10,6 +10,9 @@
 
 %% Settings and inputs:
 dataDir = '/Users/jacob/Dropbox/Projects/microSWIFT/onboard_development/data/2022-05-05_Puget_Sound_RV_Carson/V2microSWIFT043/';
+
+% dataDir = 'C:\Users\jacob\Dropbox\Projects\microSWIFT\onboard_development\data\2022-05-05_Puget_Sound_RV_Carson\V2microSWIFT043\';
+
 outputDir = '/Users/jacob/Dropbox/Projects/microSWIFT/onboard_development/';
 
 mSWIFTlabels = {'microSWIFT043 V2'};
@@ -34,7 +37,9 @@ clear gi;
 
 %% IMU processing
 % Methods
-referenceFrame = 'body'; 
+% referenceFrame = 'body'; 
+
+referenceFrame = 'earth'; 
 filterType = 'RC'; %'butterworth_dynamic'; %'butterworth_highpass'; %'RC_dynamic'; %'butterworth_highpass'
 detrendSignals = true; 
 
@@ -47,7 +52,7 @@ clear IMU; IMU(length(IMUflist)) = processmicroSWIFT_IMU([],referenceFrame);
 % Process bursts:
 for ii = 1:length(IMUflist)
     disp(['IMU file ' num2str(ii) ' of ' num2str(length(IMUflist))])
-
+    
     if strcmp(referenceFrame,'body')
         [IMU(ii),filterFunc] = processmicroSWIFT_IMU(fullfile(IMUflist(ii).folder,IMUflist(ii).name),referenceFrame,filterType,detrendSignals);
     else
@@ -73,7 +78,7 @@ f2 = transpose([-flip(f(2:end)) f(2:end)]);
 s = 1i*2*pi*f2;
 zeta = 1/sqrt(2);
 wc = 2*pi*0.05;
-% wc = 0.05;
+wc = 0.05;
 H_heave_estimator = s.^2 ./ (s.^2 +2*zeta*wc*s + wc^2).^2;
 Phat = Y.*H_heave_estimator;
 phat = ifft(Phat);
@@ -101,22 +106,22 @@ sys = tf([1 0 0],...
 sysd = c2d(sys,Ts)
 
 
-hplt = bodeplot(sysd)
-setoptions(hplt,'FreqUnits','Hz')
-% filtfilt(sysd.Numerator{:},sysd.Denominator{:},)
-% 
-phat = filter(sysd.Numerator{:},sysd.Denominator{:}, detrend(IMU.acc(:,1)));
+bodeplot(sysd)
+
+filtfilt(sysd.Numerator{:},sysd.Denominator{:},)
+
+phat = filtfilt(Num{:}, Den{:}, detrend(IMU.acc(:,1)));
 
 figure
 plot(IMU.time,phat)
 
-[E,f] = pwelch(phat,[],[],[],Fs);
+[E,f] = pwelch(phat,[],[],[],Fs)
 
 figure
 plot(f,E)
 xlabel('frequency (Hz)')
-ylabel('energy (m^2/Hz)')
-set(gca,'YScale','log'); 
+ylabel('energy (m)')
+set(gca,'YScale','log'); set(gca,'XScale','log')
 set(gca,'FontSize',14)
 
 sys = s^2/(s^2 + 2*zeta*wc*s + wc^2)^2;
@@ -141,9 +146,9 @@ set(gca,'FontSize',14)
 
 % plot 2: gyro xyz
 figure; hold on
-plot(datetime(IMU(5).time,'ConvertFrom','datenum'),IMU(5).gyro(:,1),'Marker','*')
-plot(datetime(IMU(5).time,'ConvertFrom','datenum'),IMU(5).gyro(:,2),'Marker','*')
-plot(datetime(IMU(5).time,'ConvertFrom','datenum'),IMU(5).gyro(:,3),'Marker','*')
+plot(datetime(IMU(1).time,'ConvertFrom','datenum'),cumtrapz(IMU(1).gyro(:,1))*IMU.samplingrate^(-1),'Marker','*')
+plot(datetime(IMU(1).time,'ConvertFrom','datenum'),cumtrapz(IMU(1).gyro(:,2))*IMU.samplingrate^(-1),'Marker','*')
+plot(datetime(IMU(1).time,'ConvertFrom','datenum'),cumtrapz(IMU(1).gyro(:,3))*IMU.samplingrate^(-1),'Marker','*')
 legend(mSWIFTlabels)
 xlabel('time (s)'); ylabel('gyro x')
 set(gca,'FontSize',14)
@@ -151,6 +156,7 @@ set(gca,'FontSize',14)
 % plot 3: x position
 figure; hold on
 plot(datetime(IMU(1).time,'ConvertFrom','datenum'),IMU(1).pos(:,1),'Marker','*')
+% plot(datetime(IMU(1).time,'ConvertFrom','datenum'),IMU(1).pos(:,3),'Marker','*')
 % legend(mSWIFTlabels)
 xlabel('time (s)'); ylabel('pos z'); title('phase shifted')
 set(gca,'FontSize',14)
@@ -161,6 +167,12 @@ set(gca,'FontSize',14)
 %     IMU(i).pos = IMU(i).pos(1:signalLength*0.7,:);
 %     IMU(i).time = IMU(i).time(1:signalLength*0.7);
 %     [IMU(i),GPS(i)] = collateIMUandGPS(IMU(i),GPS(i));
+
+% for i = 1:length(IMU) 
+%     signalLength = length(IMU(i).time);
+%     IMU(i).pos = IMU(i).pos(1:signalLength*0.5,:);
+%     IMU(i).time = IMU(i).time(1:signalLength*0.5);
+% %     [IMU(i),GPS(i)] = collateIMUandGPS(IMU(i),GPS(i));
 % end
 
 %% Collation and interpolation onto master clock
@@ -170,12 +182,14 @@ end
 
 %% Wave processing
 for i = 1:length(IMU)
-    id = extract(IMUflist(i).name,"microSWIFT"+digitsPattern(3));
-
+%     id = extract(IMUflist(i).name,"microSWIFT"+digitsPattern(3));
+    id = split(IMUflist(i).name,'_');
+    id = id{1};
 % XYZwaves:
     x  = GPS(i).x;
     y  = GPS(i).y;
     z  = IMU(i).pos(:,1);
+%     z  = IMU(i).pos(:,3); %z  = IMU(i).pos(:,1);
     fs = round(IMU(i).samplingrate);
     method = @() XYZwaves_microSWIFT(x,y,z,fs);
 
@@ -194,6 +208,7 @@ for i = 1:length(IMU)
     u  = GPS(i).u;
     v  = GPS(i).v;
     z  = IMU(i).pos(:,1);
+%     z  = IMU(i).pos(:,3); %z  = IMU(i).pos(:,1);
     fs = round(IMU(i).samplingrate);
     method = @() GPSandIMUwaves_microswift(u,v,z,fs);
 
@@ -203,6 +218,8 @@ for i = 1:length(IMU)
     x  = GPS(i).x;
     y  = GPS(i).y;
     z  = IMU(i).pos(:,1);
+
+%     z  = IMU(i).pos(:,3); % z  = IMU(i).pos(:,1);
     fs = round(IMU(i).samplingrate);
     method = @() LatLonZwaves_microSWIFT(x,y,z,fs);
 
@@ -242,6 +259,14 @@ end
 % mSWIFT.SWIFT = matches;
 
 %% Evaluation
+figure; hold on
+plot(GPS.lon,GPS.lat)
+plot(GPS.lon(1),GPS.lat(1),'go')
+plot(GPS.lon(end),GPS.lat(end),'rx')
+xlabel('lon')
+ylabel('lat')
+daspect([1 1 1])
+
 methodNames = fields(mSWIFT).'; methodNames = methodNames(~contains(methodNames,'SWIFT'));
 colors = [0.1 0.7 0.85; 0.83 0.14 0.14; 1.00 0.54 0.00; 0.47 0.25 0.80; 0.25 0.80 0.54];
 styles = {'-','--',':','-.'};
@@ -263,14 +288,26 @@ for m = 1:length(methodNames)
 
     end
 end
-
-plot(f,E)
-
 legend(h, [methodNames,mSWIFTlabels]);
 xlabel('frequency (Hz)')
 ylabel('Energy density (m^2/Hz)')
 set(gca,'YScale','log'); set(gca,'XScale','log')
 set(gca,'FontSize',14)
+
+<<<<<<< HEAD:microSWIFT/processrawmicroSWIFTdata_Puget_Sound_RV_Carson.asv
+=======
+
+f2 = figure; hold on
+subplot(2,1,1)
+plot(mSWIFT.XYZwaves.wavespectra.freq,mSWIFT.XYZwaves.wavespectra.a1,'DisplayName','a1')
+ylabel('a1')
+ylim([-1,1])
+subplot(2,1,2)
+plot(mSWIFT.XYZwaves.wavespectra.freq,mSWIFT.XYZwaves.wavespectra.b1,'DisplayName','b1')      
+ylabel('b1')
+xlabel('frequency (Hz)')
+ylim([-1,1])
+% exportgraphics(f1,[outputDir,datestr(mSWIFT(1).time,'ddmmmyyyy_HHMM'),'_LakeWA_scalar_spectra','.png'],'Resolution',600)
 
 
 %% Save
@@ -280,10 +317,11 @@ set(gca,'FontSize',14)
 % end
 % summary plot of RMSE for each method for every buoy (or combine buoys)!
 
-% filenameStr = join([SWIFT(1).metrics.method,SWIFT(1).metrics.referenceFrame,SWIFT(1).metrics.filterType,SWIFT(1).id],'_'); % [char(method),'_',char(SWIFT.id),'_',char(CDIP.id),'_',filenamedate]
-% save([outputDir,'matfiles/',char(filenameStr),'.mat'],'SWIFT')
+mSWIFT.IMU = IMU;
+mSWIFT.GPS = GPS;
 
-
+filenameStr = join(['Puget_Sound_RV_Carson',string(id),string(referenceFrame),string(filterType)],'_'); % [char(method),'_',char(SWIFT.id),'_',char(CDIP.id),'_',filenamedate]
+save([outputDir,'matfiles/',char(filenameStr),'.mat'],'mSWIFT')
 
 %%
 function [SWIFT] = initSWIFT(IMU,GPS,id)

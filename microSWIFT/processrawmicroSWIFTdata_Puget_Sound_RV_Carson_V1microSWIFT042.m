@@ -9,10 +9,15 @@
 %   Mapping Toolbox (deg2km)
 
 %% Settings and inputs:
-dataDir = '/Users/jacob/Dropbox/Projects/microSWIFT/onboard_development/data/2022-03-15 Lake WA/microSWIFT/Deployment_2/';
+dataDir = '/Users/jacob/Dropbox/Projects/microSWIFT/onboard_development/data/2022-05-05_Puget_Sound_RV_Carson/V2microSWIFT043/';
 outputDir = '/Users/jacob/Dropbox/Projects/microSWIFT/onboard_development/';
 
-mSWIFTlabels = {'microSWIFT040 (12Hz, SWIFTv4)','microSWIFT042 (12Hz, foam)','microSWIFT043 (48Hz, bottle-only)','microSWIFT064 (12Hz, bottle-only)','microSWIFT066 (48Hz, foam)'};
+% dataDir = '\Users\jacob\Dropbox\Projects\microSWIFT\onboard_development\data\2022-05-05_Puget_Sound_RV_Carson\V1microSWIFT042\';
+% outputDir = '\Users\jacob\Dropbox\Projects\microSWIFT\onboard_development\';
+
+mSWIFTlabels = {'microSWIFT042 V1'};
+
+% mSWIFTlabels = {'microSWIFT042 (12Hz, foam)','microSWIFT043 (48Hz, bottle-only)','microSWIFT066 (48Hz, foam)'};
 
 %% GPS processing
 
@@ -32,7 +37,7 @@ clear gi;
 
 %% IMU processing
 % Methods
-referenceFrame = 'earth'; 
+referenceFrame = 'body'; 
 filterType = 'RC'; %'butterworth_dynamic'; %'butterworth_highpass'; %'RC_dynamic'; %'butterworth_highpass'
 detrendSignals = true; 
 
@@ -54,68 +59,110 @@ for ii = 1:length(IMUflist)
     
 end  
 clear ii
+
+%% Heave estimator
+
+ [f,Y,Ma,Ph] = fast_fourier_transform(IMU.acc(:,1),IMU.samplingrate);
+
+ figure
+ plot(f,Ma)
+ xlabel('frequency (Hz)')
+ ylabel('amplitude (m)')
+ set(gca,'YScale','log'); set(gca,'XScale','log')
+ set(gca,'FontSize',14)
+
+f2 = transpose([-flip(f(2:end)) f(2:end)]);
+
+s = 1i*2*pi*f2;
+zeta = 1/sqrt(2);
+wc = 2*pi*0.05;
+% wc = 0.05;
+H_heave_estimator = s.^2 ./ (s.^2 +2*zeta*wc*s + wc^2).^2;
+Phat = Y.*H_heave_estimator;
+phat = ifft(Phat);
+
+
+Fs = IMU.samplingrate;                                          % Define Sampling Frequency
+Ts = 1/Fs;
+z = tf('z',Ts);
+H = z^2/(z^2 + 2*zeta*wc*z + wc^2)^2;
+H = z^2/(z^4 + z^3*(4*zeta*wc) + z^2*(2*wc^2 + 4*zeta^2*wc^2) + z*(4*zeta*wc^3) + wc^4);
+
+Num = H.Numerator
+Den = H.Denominator
+figure
+freqz(Num{:}, Den{:})
+
+
+
+bodeplot(Num{:},Den{:})
+
+
+sys = tf([1 0 0],...
+         [1 (4*zeta*wc) (2*wc^2 + 4*zeta^2*wc^2)  (4*zeta*wc^3) +wc^4])
+
+sysd = c2d(sys,Ts)
+
+
+hplt = bodeplot(sysd)
+setoptions(hplt,'FreqUnits','Hz')
+% filtfilt(sysd.Numerator{:},sysd.Denominator{:},)
+% 
+phat = filter(sysd.Numerator{:},sysd.Denominator{:}, detrend(IMU.acc(:,1)));
+
+figure
+plot(IMU.time,phat)
+
+[E,f] = pwelch(phat,[],[],[],Fs);
+
+figure
+plot(f,E)
+xlabel('frequency (Hz)')
+ylabel('energy (m^2/Hz)')
+set(gca,'YScale','log'); 
+set(gca,'FontSize',14)
+
+sys = s^2/(s^2 + 2*zeta*wc*s + wc^2)^2;
+
+figure; hold on
+plot(IMU.time,IMU.acc(:,1),'-')
+plot(IMU.time,yhat,'--')
+
+figure; hold on
+plot(IMU.time,phat)
 %% time series plots
 
-
-% plot 1: vertical accelerations for foam
+% plot 1: vertical accelerations (HERE IT IS z)
 figure; hold on
-plot(datetime(IMU(2).time,'ConvertFrom','datenum'),IMU(2).acc(:,3),'Marker','*')
-plot(datetime(IMU(5).time,'ConvertFrom','datenum'),IMU(5).acc(:,3),'Marker','*')
-legend({'microSWIFT042 (12Hz, foam','microSWIFT066 (48Hz, foam'})
+plot(datetime(IMU(1).time,'ConvertFrom','datenum'),IMU(1).acc(:,3),'Marker','*')
+
+
+legend(mSWIFTlabels)
 xlabel('time (s)'); ylabel('acc z')
 set(gca,'FontSize',14)
 % print(gcf,[char(outputDir),'figures/','foam_vertical_accelerations','.png'],'-dpng');
 
-% plot 2: vertical accelerations for foam, phase-shifted
+% plot 2: gyro xyz
 figure; hold on
-plot(datetime(IMU(2).time,'ConvertFrom','datenum'),IMU(2).acc(:,3),'Marker','*')
-plot(datetime(IMU(5).time,'ConvertFrom','datenum')+seconds(0.13),IMU(5).acc(:,3),'Marker','*')
-legend({'microSWIFT042 (12Hz, foam','microSWIFT066 (48Hz, foam'})
-xlabel('time (s)'); ylabel('acc z'); title('phase shifted')
-set(gca,'FontSize',14)
-
-% plot 3: gyro about x for foam
-figure; hold on
-plot(datetime(IMU(2).time,'ConvertFrom','datenum'),IMU(2).gyro(:,1),'Marker','*')
 plot(datetime(IMU(5).time,'ConvertFrom','datenum'),IMU(5).gyro(:,1),'Marker','*')
-legend({'microSWIFT042 (12Hz, foam','microSWIFT066 (48Hz, foam'})
+plot(datetime(IMU(5).time,'ConvertFrom','datenum'),IMU(5).gyro(:,2),'Marker','*')
+plot(datetime(IMU(5).time,'ConvertFrom','datenum'),IMU(5).gyro(:,3),'Marker','*')
+legend(mSWIFTlabels)
 xlabel('time (s)'); ylabel('gyro x')
 set(gca,'FontSize',14)
 
-% plot 4: vertical accelerations for bottle-only, with foam for reference
+% plot 3: z position
 figure; hold on
-plot(datetime(IMU(1).time,'ConvertFrom','datenum'),IMU(1).acc(:,3),'Marker','*')
-plot(datetime(IMU(4).time,'ConvertFrom','datenum'),IMU(4).acc(:,3),'Marker','*')
-plot(datetime(IMU(3).time,'ConvertFrom','datenum'),IMU(3).acc(:,3),'Marker','*')
-plot(datetime(IMU(5).time,'ConvertFrom','datenum'),IMU(5).acc(:,3),'Marker','*')
-legend({'microSWIFT040 (12Hz, SWIFT V4)','microSWIFT064 (12Hz, bottle-only)','microSWIFT043 (48Hz, bottle-only','microSWIFT066 (48Hz, foam'})
-xlabel('time (s)'); ylabel('acc z')
-set(gca,'FontSize',14)
-
-% plot 5: gyro about x for bottle-only, with foam for reference
-figure; hold on
-plot(datetime(IMU(4).time,'ConvertFrom','datenum'),IMU(4).gyro(:,1),'Marker','*')
-plot(datetime(IMU(3).time,'ConvertFrom','datenum'),IMU(3).gyro(:,1),'Marker','*')
-plot(datetime(IMU(5).time,'ConvertFrom','datenum'),IMU(5).gyro(:,1),'Marker','*')
-legend({'microSWIFT064 (12Hz, bottle-only)','microSWIFT043 (48Hz, bottle-only','microSWIFT066 (48Hz, foam'})
-xlabel('time (s)'); ylabel('gyro x')
-set(gca,'FontSize',14)
-
-% plot 6: z position foam
-figure; hold on
-plot(datetime(IMU(2).time,'ConvertFrom','datenum'),IMU(2).pos(:,3),'Marker','*')
-plot(datetime(IMU(5).time,'ConvertFrom','datenum')+seconds(0.6),IMU(5).pos(:,3),'Marker','*')
-legend({'microSWIFT042 (12Hz, foam','microSWIFT066 (48Hz, foam'})
+plot(datetime(IMU(1).time,'ConvertFrom','datenum'),IMU(1).pos(:,3),'Marker','*')
+% legend(mSWIFTlabels)
 xlabel('time (s)'); ylabel('pos z'); title('phase shifted')
 set(gca,'FontSize',14)
 
-
-
 %% trim IMU signal
-for i = [1,2,4] %1:length(IMU) 
+for i = [1,2,3] %1:length(IMU) 
     signalLength = length(IMU(i).time);
-    IMU(i).pos = IMU(i).pos(1:signalLength*0.7,:);
-    IMU(i).time = IMU(i).time(1:signalLength*0.7);
+    IMU(i).pos = IMU(i).pos(1:signalLength*0.45,:);
+    IMU(i).time = IMU(i).time(1:signalLength*0.45);
     [IMU(i),GPS(i)] = collateIMUandGPS(IMU(i),GPS(i));
 end
 
@@ -126,8 +173,11 @@ end
 
 %% Wave processing
 for i = 1:length(IMU)
-    id = extract(IMUflist(i).name,"microSWIFT"+digitsPattern(3));
+%     id = extract(IMUflist(i).name,"microSWIFT"+digitsPattern(3));
 
+    id = split(IMUflist(i).name,'_');
+    id = id{1};
+    
 % XYZwaves:
     x  = GPS(i).x;
     y  = GPS(i).y;
@@ -164,76 +214,82 @@ for i = 1:length(IMU)
 
     mSWIFT.LatLonZwaves(i) = processWaves(method,initSWIFT(IMU(i),GPS(i),id));
 
-    
-end
 
-%% Pull and load telemetry
-pullTelemetry = 0;
-if pullTelemetry == 1
-    ids = extract({IMUflist.name}.',"microSWIFT"+digitsPattern(3));
-    idNums = extract(ids,digitsPattern(3));
-    
-    startTime = dateshift(datetime(min(IMU(1).time),'ConvertFrom','datenum'),'start','hour');
-    endTime  = dateshift(datetime(max(IMU(1).time),'ConvertFrom','datenum'),'end','hour');
-    startTime = datestr(startTime,'yyyy-mm-ddTHH:MM:SS');
-    endTime  = datestr(endTime,'yyyy-mm-ddTHH:MM:SS');
-    
-    pullSWIFTtelemetry(cell2mat(idNums), startTime, endTime );
-    % hoseclamp interfereing w / telem? 
-else
-    telemetry = cell2struct(num2cell(NaN(11,5)),{'ID','driftdirT','driftspd','lat','lon','peakwavedirT','peakwaveperiod','sigwaveheight','time','watertemp','wavespectra'},1);
-    load('/Users/jacob/Dropbox/Projects/microSWIFT/onboard_development/data/2022-03-15 Lake WA/microSWIFT/Deployment_2/telemetry/buoy-microSWIFT 040-start-2022-03-15T20:00:00-end-2022-03-15T21:00:00.mat'); telemetry(1) = SWIFT;
-  
-    load('/Users/jacob/Dropbox/Projects/microSWIFT/onboard_development/data/2022-03-15 Lake WA/microSWIFT/Deployment_2/telemetry/buoy-microSWIFT 043-start-2022-03-15T20:00:00-end-2022-03-15T21:00:00.mat'); telemetry(3) = SWIFT;
-    
 end
-
-mSWIFT.telemetry = transpose(telemetry);
-% load([dataDir,'telemetry/buoy-microSWIFT 043-start-2022-03-15T20/00/00-end-2022-03-15T21/00/00.mat'])
 
 %% Load benchmark datasets
-
-load('/Users/jacob/Dropbox/Projects/microSWIFT/onboard_development/data/2022-03-15 Lake WA/SWIFT/SWIFT22_15Mar2022_reprocessedSBG.mat'); SWIFT22 = SWIFT;
-load('/Users/jacob/Dropbox/Projects/microSWIFT/onboard_development/data/2022-03-15 Lake WA/SWIFT/SWIFT23_15Mar2022_reprocessedSBG.mat'); SWIFT23 = SWIFT;
-load('/Users/jacob/Dropbox/Projects/microSWIFT/onboard_development/data/2022-03-15 Lake WA/SWIFT/SWIFT24_15Mar2022_reprocessedSBG.mat'); SWIFT24 = SWIFT;
-load('/Users/jacob/Dropbox/Projects/microSWIFT/onboard_development/data/2022-03-15 Lake WA/SWIFT/SWIFT25_15Mar2022_reprocessedSBG.mat'); SWIFT25 = SWIFT; 
-
-clear SWIFT
-SWIFT.SWIFT22 = SWIFT22;
-SWIFT.SWIFT23 = SWIFT23;
-SWIFT.SWIFT24 = SWIFT24;
+% 
+% load('/Users/jacob/Dropbox/Projects/microSWIFT/onboard_development/data/2022-03-17 PugetSound/SWIFT/SWIFT22_17Mar2022_reprocessedSBG.mat'); SWIFT22 = SWIFT;
+% load('/Users/jacob/Dropbox/Projects/microSWIFT/onboard_development/data/2022-03-17 PugetSound/SWIFT/SWIFT23_17Mar2022_reprocessedSBG.mat'); SWIFT23 = SWIFT;
+% load('/Users/jacob/Dropbox/Projects/microSWIFT/onboard_development/data/2022-03-17 PugetSound/SWIFT/SWIFT24_17Mar2022_reprocessedSBG.mat'); SWIFT24 = SWIFT;
+% load('/Users/jacob/Dropbox/Projects/microSWIFT/onboard_development/data/2022-03-17 PugetSound/SWIFT/SWIFT24_17Mar2022_reprocessedSBG.mat'); SWIFT25 = SWIFT;
+% clear SWIFT
+% SWIFT.SWIFT22 = SWIFT22;
+% SWIFT.SWIFT23 = SWIFT23;
+% SWIFT.SWIFT24 = SWIFT24;
 % SWIFT.SWIFT25 = SWIFT25;
-
-% average by hour
-SWIFTavgd = avgSWIFTS(SWIFT);
-
-% datetime([SWIFTavgd.SWIFT25.time],'ConvertFrom','datenum')
+% 
+% % average by hour
+% SWIFTavgd = avgSWIFTS(SWIFT);
 
 %% match mSWIFTs and SWIFTS
-SWIFTs = fields(SWIFTavgd);
-
-for s = 1:length(SWIFTs)
-    mSWIFTtime = mean(IMU(1).time); % datetime(mean(IMU(1).time),'ConvertFrom','datenum'); % datestr(median(IMU.time),'yyyy-mm-dd HH:MM:SS UTC');
-    differences = abs([SWIFTavgd.(SWIFTs{s}).time] - mSWIFTtime);
-    temp = SWIFTavgd.(SWIFTs{s})(differences == min(abs(differences)));
-    if s==1
-        matches = temp;
-    else
-        matches  = [matches ,temp];
-    end 
-end
-
-mSWIFT.SWIFT = matches;
+% SWIFTs = fields(SWIFT)
+% for s = 1:length(SWIFTs)
+%     mSWIFTtime = mean(IMU(1).time); % datetime(mean(IMU(1).time),'ConvertFrom','datenum'); % datestr(median(IMU.time),'yyyy-mm-dd HH:MM:SS UTC');
+%     differences = abs([SWIFTavgd.(SWIFTs{s}).time] - mSWIFTtime);
+%     temp = SWIFTavgd.(SWIFTs{s})(differences == min(abs(differences)));
+%     if s==1
+%         matches = temp;
+%     else
+%         matches  = [matches ,temp];
+%     end 
+% end
+% 
+% mSWIFT.SWIFT = matches;
 
 %% Evaluation
 methodNames = fields(mSWIFT).'; methodNames = methodNames(~contains(methodNames,'SWIFT'));
-methodNames = methodNames(~contains(methodNames,'GPSandIMUwaves'));
-% methodNames = methodNames(~contains(methodNames,'telemetry'));
-% methodNames = {'XYZwaves','GPSwaves'};
 colors = [0.1 0.7 0.85; 0.83 0.14 0.14; 1.00 0.54 0.00; 0.47 0.25 0.80; 0.25 0.80 0.54];
 styles = {'-','--',':','-.'};
 
-evalPlots(mSWIFT,mSWIFTlabels,methodNames,colors,styles,3);
+figure; hold on
+h = zeros(length(methodNames)+length(mSWIFTlabels), 1);
+for m = 1:length(methodNames)
+    h(m) = plot(NaN,NaN,'k','LineStyle',styles{m},'LineWidth',1.5,'DisplayName',methodNames{m});
+    for i = 1:length(mSWIFT.(methodNames{m}))
+            mSWIFT.(methodNames{m})(i).time
+            plot(mSWIFT.(methodNames{m})(i).wavespectra.freq,mSWIFT.(methodNames{m})(i).wavespectra.energy,'LineStyle',styles{m},'LineWidth',1.5,'color',colors(i,:),'DisplayName',mSWIFTlabels{i},'HandleVisibility','off')
+            set(gca,'YScale','log'); set(gca,'XScale','log')
+            xlabel('frequency (Hz)')
+            ylabel('Energy density (m^2/Hz)')
+
+        if m==length(methodNames)
+            h(m+i) = plot(NaN,NaN,'o','Color',colors(i,:),'DisplayName',mSWIFTlabels{i});
+        end
+
+    end
+end
+
+plot(f,E)
+
+legend(h, [methodNames,mSWIFTlabels]);
+xlabel('frequency (Hz)')
+ylabel('Energy density (m^2/Hz)')
+set(gca,'YScale','log'); set(gca,'XScale','log')
+set(gca,'FontSize',14)
+
+f2 = figure; hold on
+subplot(2,1,1)
+plot(mSWIFT.XYZwaves.wavespectra.freq,mSWIFT.XYZwaves.wavespectra.a1,'DisplayName','a1')
+ylabel('a1')
+subplot(2,1,2)
+plot(mSWIFT.XYZwaves.wavespectra.freq,mSWIFT.XYZwaves.wavespectra.b1,'DisplayName','b1')      
+ylabel('b1')
+
+xlabel('frequency (Hz)')
+
+% exportgraphics(f1,[outputDir,datestr(mSWIFT(1).time,'ddmmmyyyy_HHMM'),'_LakeWA_scalar_spectra','.png'],'Resolution',600)
+
 
 %% Save
 % figure; hold on
@@ -242,8 +298,11 @@ evalPlots(mSWIFT,mSWIFTlabels,methodNames,colors,styles,3);
 % end
 % summary plot of RMSE for each method for every buoy (or combine buoys)!
 
-% filenameStr = join([SWIFT(1).metrics.method,SWIFT(1).metrics.referenceFrame,SWIFT(1).metrics.filterType,SWIFT(1).id],'_'); % [char(method),'_',char(SWIFT.id),'_',char(CDIP.id),'_',filenamedate]
-% save([outputDir,'matfiles/',char(filenameStr),'.mat'],'SWIFT')
+mSWIFT.IMU = IMU;
+mSWIFT.GPS = GPS;
+
+filenameStr = join(['Puget_Sound_RV_Carson',string(id),string(referenceFrame),string(filterType)],'_'); % [char(method),'_',char(SWIFT.id),'_',char(CDIP.id),'_',filenamedate]
+% save([outputDir,'matfiles/',char(filenameStr),'.mat'],'mSWIFT')
 
 
 
@@ -305,6 +364,7 @@ for s = 1:length(SWIFTs)
                 tmp = {SWIFT.(SWIFTs{s})(SWIFThrs == hrs(h)).(SWIFTfields{f})};
                 SWIFTavgd.(SWIFTs{s})(h).(SWIFTfields{f}) = tmp{1};
             elseif strcmp(SWIFTfields{f},'wavespectra')
+                SWIFT.(SWIFTs{s}).wavespectra
                 tmp = [SWIFT.(SWIFTs{s})(SWIFThrs == hrs(h)).wavespectra];
                 subfields = fields(tmp);
                 for sf = 1:length(subfields)
@@ -330,7 +390,7 @@ for s = 1:length(SWIFTs)
 end
 end
 
-function [f1,f2]=evalPlots(mSWIFT,mSWIFTlabels,methodNames,colors,styles,innerLoopIndices)
+function [f1,f2]=evalPlots(mSWIFT,mSWIFTlabels,methodNames,colors,styles)
 
 SWIFTs = {mSWIFT.SWIFT.ID};
 
@@ -346,33 +406,19 @@ end
 h = zeros(length(methodNames)+length(mSWIFTlabels), 1);
 for m = 1:length(methodNames)
     h(m) = plot(NaN,NaN,'k','LineStyle',styles{m},'LineWidth',1.5,'DisplayName',methodNames{m});
-
-    if strcmp(innerLoopIndices,'all')  
-        innerLoopRange = 1:length(mSWIFT.(methodNames{m}));
-    else
-        innerLoopRange = innerLoopIndices;
-    end
-
-    for i = innerLoopRange
-        if strcmp(methodNames{m},'telemetry')
-            try
-                plot(mSWIFT.(methodNames{m})(i).wavespectra.freq,mSWIFT.(methodNames{m})(i).wavespectra.energy,'LineStyle',styles{m},'LineWidth',1.5,'color',colors(i,:),'DisplayName',mSWIFTlabels{i},'HandleVisibility','off')
-            catch
-            end
-        else
-            plot(mSWIFT.(methodNames{m})(i).wavespectra.freq,mSWIFT.(methodNames{m})(i).wavespectra.energy,'LineStyle',styles{m},'LineWidth',1.5,'color',colors(i,:),'DisplayName',mSWIFTlabels{i},'HandleVisibility','off')
-        end
+    for i = 1:length(mSWIFT.(methodNames{m}))
+        mSWIFT.(methodNames{m})(i).time
+        plot(mSWIFT.(methodNames{m})(i).wavespectra.freq,mSWIFT.(methodNames{m})(i).wavespectra.energy,'LineStyle',styles{m},'LineWidth',1.5,'color',colors(i,:),'DisplayName',mSWIFTlabels{i},'HandleVisibility','off')
         set(gca,'YScale','log'); set(gca,'XScale','log')
         xlabel('frequency (Hz)')
         ylabel('Energy density (m^2/Hz)')
 
         if m==length(methodNames)
-            h(m+i) = plot(NaN,NaN,'o','Color',colors(i,:),'MarkerFaceColor',colors(i,:),'DisplayName',mSWIFTlabels{i});
+            h(m+i) = plot(NaN,NaN,'o','Color',colors(i,:),'DisplayName',mSWIFTlabels{i});
         end
     end
 end
-
-legend(h(h~=0), [methodNames,mSWIFTlabels{innerLoopRange}]);
+legend(h, [methodNames,mSWIFTlabels]);
 xlabel('frequency (Hz)')
 ylabel('Energy density (m^2/Hz)')
 set(gca,'YScale','log'); set(gca,'XScale','log')
@@ -396,32 +442,18 @@ for d = 1:length(dircoeffs)
     h = zeros(length(methodNames)+length(mSWIFTlabels), 1);
     for m = 1:length(methodNames)
          h(m) = plot(NaN,NaN,'k','LineStyle',styles{m},'LineWidth',1.5,'DisplayName',methodNames{m});
-
-        if strcmp(innerLoopIndices,'all')  
-            innerLoopRange = 1:length(mSWIFT.(methodNames{m}));
-        else
-            innerLoopRange = innerLoopIndices;
-        end
-    
-        for i = innerLoopRange
-            if strcmp(methodNames{m},'telemetry')
-                try
-                    plot(mSWIFT.(methodNames{m})(i).wavespectra.freq,mSWIFT.(methodNames{m})(i).wavespectra.(dircoeffs{d}),...
-                        'LineStyle',styles{m},'LineWidth',1.5,'color',colors(i,:),'DisplayName',mSWIFTlabels{i},'HandleVisibility','off')
-
-                catch
-                end
-            else
-                plot(mSWIFT.(methodNames{m})(i).wavespectra.freq,mSWIFT.(methodNames{m})(i).wavespectra.(dircoeffs{d}),...
-                    'LineStyle',styles{m},'LineWidth',1.5,'color',colors(i,:),'DisplayName',mSWIFTlabels{i},'HandleVisibility','off')
-            end
+        for i = 1:length(mSWIFT.(methodNames{m}))
+            mSWIFT.(methodNames{m})(i).time
+            plot(mSWIFT.(methodNames{m})(i).wavespectra.freq,mSWIFT.(methodNames{m})(i).wavespectra.(dircoeffs{d}),...
+                'LineStyle',styles{m},'LineWidth',1.5,'color',colors(i,:),'DisplayName',mSWIFTlabels{i},'HandleVisibility','off')
+            
             if m==length(methodNames)
-                h(m+i) = plot(NaN,NaN,'o','Color',colors(i,:),'MarkerFaceColor',colors(i,:),'DisplayName',mSWIFTlabels{i});
+                h(m+i) = plot(NaN,NaN,'o','Color',colors(i,:),'DisplayName',mSWIFTlabels{i});
             end
         end
     end
 
-     xlim([0 1])
+     xlim([min(mSWIFT.(methodNames{m})(i).wavespectra.freq),max(mSWIFT.(methodNames{m})(i).wavespectra.freq)])
      ylim([-1 1])
      ylabel((dircoeffs{d}))
      set(gca,'FontSize',14)
@@ -429,7 +461,7 @@ for d = 1:length(dircoeffs)
 
 end
 xlabel('frequency (Hz)')
-lgd = legend(h(h~=0), [methodNames,mSWIFTlabels{innerLoopRange}],'Location','southoutside');
+lgd = legend(h, [methodNames,mSWIFTlabels],'Location','southoutside');
 lgd.Layout.Tile = d+1;
 % exportgraphics(f1,[outputDir,datestr(mSWIFT(1).time,'ddmmmyyyy_HHMM'),'_LakeWA_scalar_spectra','.png'],'Resolution',600)
 

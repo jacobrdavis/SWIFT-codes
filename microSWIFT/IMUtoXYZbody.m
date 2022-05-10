@@ -1,5 +1,5 @@
 function [IMU,filterFunc] = IMUtoXYZbody(IMU,filterType,detrendSignals,fc)
-plotFlag = false;
+plotFlag = true;
 
 t  = IMU.time;
 fs = IMU.samplingrate;
@@ -18,18 +18,35 @@ plot( datetime(IMU.time,'ConvertFrom','datenum'),IMU.acc)
 for i = 1:3
 
     a = IMU.acc(:,i) - 10.025;
-%     if detrendSignals == 1; a = detrend(a); end %a  = a - mean(a);
+    if detrendSignals == 1; a = detrend(a); end %a  = a - mean(a); % uncommented on 5/6/2022
+
+ % % % % zero out nonzero initial and end conditions
+%     ZeroCrossings = find(diff(sign(a)));
+%     
+%     figure; hold on
+%     plot(IMU.time,a)
+%    	plot(IMU.time(ZeroCrossings(1)),a(ZeroCrossings(1)),'x')
+%     plot(IMU.time(ZeroCrossings(end)),a(ZeroCrossings(end)),'x')
+%     
+% 
+%     a(1:ZeroCrossings(1)) = 0;
+%     a(ZeroCrossings(end):end) = 0;
+%     
+%     figure; hold on
+%     plot(IMU.time,a)
+% % % %    
+
     a_f = filterFunc(a);
 %     fc2 = 6;
 %     [b2,a2] = butter(3,fc2/(fs/2),'low');
 %     a_f = filtfilt(b2,a2,a)
-    if plotFlag == 1 && i==3; plotsignal(a,a_f,t,fs,fc,'acc (m/s^2)'); end
+    if plotFlag == 1 && i==1; plotsignal(a,a_f,t,fs,fc,'acc (m/s^2)'); end
 
     v = cumtrapz(a_f)*dt; % m/s
     if detrendSignals == 1; v = detrend(v,'omitnan'); end
     v_f = filterFunc(v);
     IMU.vel(:,i) = v_f;
-    if plotFlag == 1 && i==3; plotsignal(v,v_f,t,fs,fc,'vel (m/s)'); end
+    if plotFlag == 1 && i==1; plotsignal(v,v_f,t,fs,fc,'vel (m/s)'); end
 
     p = cumtrapz(v_f)*dt; % m
     if detrendSignals == 1; p = detrend(p,'omitnan'); end
@@ -38,9 +55,10 @@ for i = 1:3
         p_f(1:round(4*fs/fc),:) = 0; % round(RC./dt*20) remove first portion, which can have initial oscillations from filtering
     end
     IMU.pos(:,i) = p_f;
-    if plotFlag == 1 && i==3;  plotsignal(p,p_f,t,fs,fc,'pos (m)'); end
+    if plotFlag == 1 && i==1;  plotsignal(p,p_f,t,fs,fc,'pos (m)'); end
 
 end
+
 
 end
 
