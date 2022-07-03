@@ -12,30 +12,31 @@
 %                       apply a reference velocity (drift) to Signature profiles
 %                       include Signature backscatter in new burst ensembles
 %                       use dissipation_simple
-%
-% left to do:
-%   ** need to add met data... and maybe wave spectra? ***
+%               7/2022  add option for Airmar GPS positions instead of SBG or IMU
+%                       did not (yet) include met, but could easily now
 %
 clear; close all
 
-fullprocess = false; % option to force concatSWIFT_offloadedSDcard, reprocess_SIG_raw, reprocess_SBG_raw, reprocess_ACS_raw
+fullprocess = true; % option to force concatSWIFT_offloadedSDcard, reprocess_SIG_raw, reprocess_SBG_raw, reprocess_ACS_raw
+useairmarpositions = true; % option to use Airmar (PB2) GPS data instead of SBG or IMU
 applyvelreference = true; % apply drift correction to signature velocity data
 rmwaves = true; % remove wave products (for short dt)
+depthprune = false; % option to remove bins below altimeter reading... set to false in deep water
 
-dt=10; %timestep to average over in seconds
+dt=30; %timestep to average over in seconds
 num=floor(512/dt); % number of new bursts per normal burst (512 s)
 
 maxsalinity = 35; % for QC
-minsalinity = 5; % for QC
+minsalinity = 15; % for QC
 percentdry = .1; % maximum precent dry to allow when retaining a new burst, increase to keep more
     % also relax the QC in compileSWIFT_SBDtelemetry to keep more partial bursts
 mincor = 0; % for QC when reprocessing turbulence data
 maxdriftspd = 2.5;
 
-parentdir = '/Volumes/USRSdata/MobileBay/SWIFT/';  % change to suit data
+parentdir = '~/Desktop/Main_Jun2022/SWIFTs/';  % change to suit data
 cd(parentdir)
 
-SW_list=dir('SWIFT*09Jun2021'); % list of SWIFT directories to reprocess
+SW_list=dir('SWIFT29*02Jul2022'); % list of SWIFT directories to reprocess
 
 for sn=1:length(SW_list);
     disp(['SWIFT ' num2str(sn) ' of ' num2str(length(SW_list))])
@@ -44,7 +45,12 @@ for sn=1:length(SW_list);
     cd(name)
     if fullprocess==true | isempty(dir([name '_reprocessed.mat'])),
         save temp
-        concatSWIFT_offloadedSDcard, reprocess_SIG_raw, reprocess_SBG_raw, reprocess_ACS_raw
+        %concatSWIFT_offloadedSDcard, reprocess_SIG_raw, reprocess_SBG_raw, reprocess_ACS_raw
+        if useairmarpositions
+            reprocess_SIG_raw, reprocess_PB2_raw, reprocess_ACS_raw
+        else
+            reprocess_SIG_raw, reprocess_SBG_raw, reprocess_ACS_raw
+        end
         clear all
         load temp
     end
@@ -582,11 +588,13 @@ for sn=1:length(SW_list);
                 gyro=nanmedian(gyro_raw);
                 
                 % remove points below seabed
+                if depthprune
                 east( z>(depth-dz) ) = NaN;
                 north( z>(depth-dz) ) = NaN;
                 wbar( z>(depth-dz) ) = NaN;
                 wvar( z>(depth-dz) ) = NaN;
-                
+                else
+                end              
                 
                 
                 rawVel=rawVelHR_original(SIGh_s:SIGh_e,:);
@@ -598,7 +606,7 @@ for sn=1:length(SW_list);
                 rawVel(exclude)=NaN;
                 
                 [tke , epsilon , residual, A, Aerror, N, Nerror] = ...
-                    dissipation_simple(rawVel', z_SIGhr_original, size(rawVel,1), 0, zeros(size(z_SIGhr_original)));
+                    dissipation(rawVel', z_SIGhr_original, size(rawVel,1), 0, zeros(size(z_SIGhr_original)));
                 %warning('off','last')
                 
                 
@@ -738,9 +746,12 @@ for sn=1:length(SW_list);
     ylabel('z [m]'), xlabel('speed [m/s]')
     print('-dpng',[SW_list(sn).name '_highres_dt' num2str(dt) 's_signatureprofiles.png'])
     
-    %% QC for max drift
+    %% QC for max drift and salinity limits
     toofast = find([SWIFT.driftspd]>maxdriftspd);
     SWIFT_highres(toofast) = [];
+    badsalt = find( isnan([SWIFT_highres.salinity]) | [SWIFT_highres.salinity] < minsalinity  |  [SWIFT_highres.salinity]>maxsalinity );
+    SWIFT_highres(badsalt) = [];
+
     
     %% option to remove waves
     if rmwaves, 
@@ -753,7 +764,8 @@ for sn=1:length(SW_list);
     clear SWIFT
     SWIFT=SWIFT_highres;
     save([SW_list(sn).name '_highres_dt' num2str(dt) 's.mat'],'SWIFT')
-    clearvars -except SW_list parentdir num dt fullprocess applyvelreference maxsalinity minsalinity mincor percentdry maxdriftspd rmwaves
+    clearvars -except SW_list parentdir num dt fullprocess applyvelreference maxsalinity minsalinity mincor percentdry maxdriftspd rmwaves depthprune useairmarpositions
+
     cd ..
     
     

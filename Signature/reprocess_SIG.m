@@ -69,11 +69,12 @@ for di = 1:length(dirlist),
             %% reprocess HR (burst) data
             
             z = xcdrdepth + burst.Blanking + burst.CellSize * [1:size(burst.VelocityData,2)];
-            dt = range(burst.time)./length(burst.time)*24*3600;
+            dt = (max(burst.time)-min(burst.time))./length(burst.time)*24*3600;
             fs = 1/dt;
             windowlength=64;
             
             % quality control burst (HR) velocity data
+            clear wdespiked;
             wraw = burst.VelocityData;
             for HRbin=1:size(burst.VelocityData,2)
                 wdespiked(:,HRbin) = filloutliers( wraw(:,HRbin), 'linear');
@@ -103,7 +104,7 @@ for di = 1:length(dirlist),
                 inertial = find(f>1);
                 tkepsd = wpsd;
                 compwpsd = mean( tkepsd(inertial) .* ( 2*3.14* f(inertial)).^(5/3) )./ 8;
-                advect = ( var(urot(:,HRbin)) + var(vrot(:,HRbin)) + var(wdespiked(:,HRbin)) ).^.5; % body rotations AND self advection
+                advect = ( var(urot(:,HRbin)) + var(vrot(:,HRbin)) + var(wdespiked(:,HRbin)) ).^.5; % rot.  AND self advection
                 
                 if advect>0 & compwpsd > 0
                     epsilon_spec(1,HRbin) = ( compwpsd .* advect.^(-2/3) ).^(3/2);
@@ -124,7 +125,8 @@ for di = 1:length(dirlist),
                         xlabel('Frequency [Hz]')
                         ylabel('TKE [m^2/s^2/Hz]')
                         title('Signature HR Spectra at each range bin, with buoy motion (black)')
-                        cb=colorbar('peer',gca,'EastOutside','YTickLabel',linspace(min(z),max(z),5),'Ytick',[0:.25:1],'ydir','reverse');
+                        cb=colorbar('peer',gca,'EastOutside','YTickLabel',... 
+                            linspace(min(z),max(z),5),'Ytick',[0:.25:1],'ydir','reverse');
                         cb.Label.String = 'z [m]';
                         print('-dpng',[filelist(fi).name(1:end-4) '_burstHRspectra.png'])
                         
@@ -217,7 +219,7 @@ for di = 1:length(dirlist),
             figure(4), clf
             subplot(1,4,1)
             plot( squeeze( nanmean(avg.AmplitudeData) ), avg.z ,'linewidth',1.5), hold on
-            plot(0, avg.AltimeterDistance,'kx')            
+            if isfield(avg,'AltimeterDistance'), plot(0, avg.AltimeterDistance,'kx'), end            
             xlabel('Amp [-]')
             ylabel('z [m]')
             set(gca,'ydir','reverse')
@@ -225,7 +227,7 @@ for di = 1:length(dirlist),
             
             subplot(1,4,2)
             plot( squeeze( nanmean(avg.CorrelationData) ), avg.z ,'linewidth',1.5), hold on
-            plot(0, avg.AltimeterDistance,'kx')            
+            if isfield(avg,'AltimeterDistance'), plot(0, avg.AltimeterDistance,'kx'), end            
             xlabel('Corr [%]')
             ylabel('z [m]')
             set(gca,'ydir','reverse')
@@ -234,7 +236,7 @@ for di = 1:length(dirlist),
             
             subplot(1,4,3)
             plot( squeeze( nanmean(avg.VelocityData(:,:,1:2)) ), avg.z ,'linewidth',1.5), hold on
-            plot(0, avg.AltimeterDistance,'kx')            
+            if isfield(avg,'AltimeterDistance'), plot(0, avg.AltimeterDistance,'kx'), end            
             xlabel('u,v [m/s]')
             ylabel('z [m]')
             set(gca,'ydir','reverse')
@@ -242,7 +244,7 @@ for di = 1:length(dirlist),
             
             subplot(1,4,4)
             plot( squeeze( nanmean(avg.VelocityData(:,:,3:4)) ), avg.z ,'linewidth',1.5), hold on
-            plot(0, avg.AltimeterDistance,'kx')            
+            if isfield(avg,'AltimeterDistance'), plot(0, avg.AltimeterDistance,'kx'), end            
             xlabel('w [m/s]')
             ylabel('z [m]')
             set(gca,'ydir','reverse')
@@ -254,8 +256,10 @@ for di = 1:length(dirlist),
             
             %% echo sounder processing
             
-            echo.z = xcdrdepth + echo.Blanking + echo.CellSize .* [1:size([echo.EchoSounder],2)];
-            rescaleacc = -9.8/nanmean(echo.Accelerometer(:,3));
+            if ~isempty(echo)
+                echo.z = xcdrdepth + echo.Blanking + echo.CellSize .* [1:size([echo.EchoSounder],2)];
+                rescaleacc = -9.8/nanmean(echo.Accelerometer(:,3));
+            end
 
             if ~isempty(echo) & plotflag
                 
@@ -290,7 +294,8 @@ for di = 1:length(dirlist),
             
             %% match time to SWIFT structure and replace values
             
-            time=datenum(filelist(fi).name(13:21))+datenum(0,0,0,str2num(filelist(fi).name(23:24)),(str2num(filelist(fi).name(26:27))-1)*12,0);
+            time=datenum(filelist(fi).name(13:21))+datenum(0,0,0,str2num(filelist(fi).name(23:24)),...
+                (str2num(filelist(fi).name(26:27))-1)*12,0);
             [tdiff tindex] = min(abs([SWIFT.time]-time));
             bad(tindex) = false;
             
@@ -298,7 +303,8 @@ for di = 1:length(dirlist),
                 SWIFT(tindex).signature.HRprofile.wbar = HRwbar;
                 SWIFT(tindex).signature.HRprofile.wvar = HRwvar;
                 SWIFT(tindex).signature.HRprofile.z = z;
-                SWIFT(tindex).signature.HRprofile.tkedissipationrate_onboard = SWIFT(tindex).signature.HRprofile.tkedissipationrate;
+                SWIFT(tindex).signature.HRprofile.tkedissipationrate_onboard = ... 
+                    SWIFT(tindex).signature.HRprofile.tkedissipationrate;
                 SWIFT(tindex).signature.HRprofile.tkedissipationrate_strfcn = epsilon;
                 SWIFT(tindex).signature.HRprofile.tkedissipationrate_spectral = epsilon_spec;
                 SWIFT(tindex).signature.profile.wbar = avgwbar;
@@ -331,7 +337,8 @@ for di = 1:length(dirlist),
 %                 print('-dpng',[filelist(fi).name(1:end-4) '_verticalvelocities.png'])
                 
                 figure(9), clf
-                semilogx(SWIFT(tindex).signature.HRprofile.tkedissipationrate_onboard,SWIFT(tindex).signature.HRprofile.z,'k-'), hold on
+                semilogx(SWIFT(tindex).signature.HRprofile.tkedissipationrate_onboard,... 
+                    SWIFT(tindex).signature.HRprofile.z,'k-'), hold on
                 semilogx(epsilon,z,'rx'), hold on
                 semilogx(epsilon_spec,z,'bo'), hold on
                 legend('onboard','str func','spectral','Location','NorthEastOutside')

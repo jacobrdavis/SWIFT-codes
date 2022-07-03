@@ -71,7 +71,18 @@ BatteryVoltage = NaN; % placeholder
 SWIFTversion = []; % placeholder
 
 %% SWIFT id flag from file name
-SWIFT.ID = fname(6:13);
+% note that all telemetry files from server start with 5 char 'buoy-'
+% this will fail for any other prefix of file naming convention
+
+if fname(6)=='S', % SWIFT v3 and v4
+    SWIFT.ID = fname(12:13);
+elseif fname(6)=='m', % microSWIFT
+    SWIFT.ID = fname(17:19);
+else
+    SWIFT.ID = NaN;
+end
+
+
 %%
 payloadtype = fread(fid,1,'uint8=>char');
 
@@ -365,7 +376,7 @@ while 1
         hour = fread(fid,1,'uint32'); % hour
         minute = fread(fid,1,'uint32'); % minute
         second = fread(fid,1,'uint32'); % seconds
-        SWIFT.time = datenum( year, month, day, hour, minute, second);
+        SWIFT.time = datenum( year, month, day, hour, minute, second); % time at end of burst
         
         
     elseif type == 51 & size > 0, % microSWIFT, size should be 237 bytes
@@ -400,7 +411,7 @@ while 1
         hour = fread(fid,1,'uint32'); % hour
         minute = fread(fid,1,'uint32'); % minute
         second = fread(fid,1,'uint32'); % seconds
-        SWIFT.time = datenum( year, month, day, hour, minute, second);
+        SWIFT.time = datenum( year, month, day, hour, minute, second); % time at end of burst
         
     else
         

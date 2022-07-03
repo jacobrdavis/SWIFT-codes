@@ -16,7 +16,8 @@
 %             9/2018 improve screening for bad bursts
 %             4/2019 disable screening for dir changes (proxy for ship recovery)
 %                   and give messages for burst screening
-%             9/2019   force timestamp from SBD filename always, rather than Airmar
+%             9/2019   force timestamp from filename always, rather than Airmar
+%             7/2022    allow microSWIFT timestamps (not from filename)
 clear all,
 
 plotflag = 1;  % binary flag for plotting (compiled plots, not individual plots... that flag is in the readSWIFT_SBD call)
@@ -25,9 +26,9 @@ fixspectra = false; % binary flag to redact low freq wave spectra
 
 minwaveheight = 0; % minimum wave height in data screening
 
-minsalinity = 0; % PSU, for use in screen points when buoy is out of the water (unless testing on Lake WA)
+minsalinity = 20; % PSU, for use in screen points when buoy is out of the water (unless testing on Lake WA)
 
-maxdriftspd = 1.5;  % m/s, for screening when buoy on deck of boat
+maxdriftspd = 3;  % m/s, this is applied to telemetry drift speed, but reported drift is calculated after that 
 
 maxwindspd = 30; % m/s for malfunctioning Airmars
 
@@ -58,33 +59,30 @@ for ai = 1:length(flist),
         oneSWIFT.lon = NaN;
     end
     
-    %% time stamp: take the time from the filename, even when there is time from the airmar
-    % for telemetry, this is the telemtry time (at the end of the burst).
-    % for offloaded data, this the concat file name (from the start of the burst)
+    %% time stamp
     
-    if flist(ai).name(6)=='S', % SWIFT
+    if flist(ai).name(6)=='S', % SWIFT v3 and v4
+        % take the time from the filename, 
+        % even when there is time from the airmar (because of parsing errors)
+        % for telemetry, this is the telemtry time (at the end of the burst).
+        % for offloaded data, this the concat file name (from the start of the burst)
         nameoffset = 14;
+        day = flist(ai).name(nameoffset + [1:2]);
+        month = flist(ai).name(nameoffset + [3:5]);
+        year = flist(ai).name(nameoffset + [6:9]);
+        hr = flist(ai).name(nameoffset + [11:12]);
+        minute = flist(ai).name(nameoffset + [13:14]);
+        sec = flist(ai).name(nameoffset + [15:16]);
+        oneSWIFT.time = datenum([day ' ' month ' ' year ' ' hr ':' minute ':' sec]);
+
     elseif flist(ai).name(6)=='m', % microSWIFT
         nameoffset = 20;
+        % use the time embedded within the payload 50 or 51 of the SBD file
+        % which is the time at the end of the burst of raw data
     else
         nameoffset = 0;
+        oneSWIFT.time = NaN;
     end
-    
-    day = flist(ai).name(nameoffset + [1:2]);
-    month = flist(ai).name(nameoffset + [3:5]);
-    year = flist(ai).name(nameoffset + [6:9]);
-    hr = flist(ai).name(nameoffset + [11:12]);
-    minute = flist(ai).name(nameoffset + [13:14]);
-    sec = flist(ai).name(nameoffset + [15:16]);
-    
-    oneSWIFT.time = datenum([day ' ' month ' ' year ' ' hr ':' minute ':' sec]);
-    
-    
-    %     if isempty(oneSWIFT.time),
-    %         oneSWIFT.time = datenum([day ' ' month ' ' year ' ' hr ':' minute ':' sec]);
-    %     elseif oneSWIFT.time == 0 |  isnan(oneSWIFT.time) | oneSWIFT.time < datenum(2014,1,1),
-    %         oneSWIFT.time = datenum([day ' ' month ' ' year ' ' hr ':' minute ':' sec]);
-    %     end
     
     
     %% remove bad Airmar data
@@ -101,7 +99,7 @@ for ai = 1:length(flist),
     % while requiring energy at lowest frequenc to be zero
     % not neccessary if post-processing for raw displacements
     % less necessary after Oct 2017 rev of onboard processing with improved RC filter
-    if fixspectra & isfield(oneSWIFT,'wavespectra')
+    if fixspectra && isfield(oneSWIFT,'wavespectra')
         notzero = find(oneSWIFT.wavespectra.energy ~= 0 & oneSWIFT.wavespectra.freq > 0.04);
         tobereplaced =  find(oneSWIFT.wavespectra.energy == 0 & oneSWIFT.wavespectra.freq > 0.04);
         if length(notzero) > 10,
@@ -194,6 +192,8 @@ for ai = 1:length(flist),
     if isfield(oneSWIFT,'driftspd')
         if oneSWIFT.driftspd > maxdriftspd,
             badburst(ai) = true;
+            disp('=================================')
+            disp('speed too fast, removing burst')
         end
     end
     
@@ -215,12 +215,12 @@ SWIFT = SWIFT(tinds);
 battery = battery(tinds);
 
 
-%% calc drift (note that wind slip, which is 5%, is not removed)
-% drift speed is included from the Airmar results, but that sensor is not
-% always available or included
+%% calc drift (note that wind slip, which is 1%, is not removed)
+% drift speed is included from the Airmar results, 
+% but that sensor is not always available or included
 % (so simpler to just calculate it from differencing positions)
 
-if length(SWIFT) > 3,
+if length(SWIFT) > 3 %&& ~isfield(SWIFT,'driftspd')
     
     time = [SWIFT.time];%[time tinds ] = sort(time);
     lat = [SWIFT.lat]; %lat = lat(tinds);
@@ -256,7 +256,7 @@ if length(SWIFT) > 3,
     %         battery( length(SWIFT) ) = [];
     %     end
     
-else
+elseif length(SWIFT) <= 3 %&& ~isfield(SWIFT,'driftspd')
     for si = 1:length(SWIFT),
         SWIFT(si).driftspd = NaN;
         SWIFT(si).driftdirT = NaN;
@@ -276,11 +276,16 @@ if length([SWIFT.time]) > 1,
 else
 end
 
+% quality control drift speeds too fast (prob on deck) with new drift spd
+toofast = [SWIFT.driftspd] > maxdriftspd;
+SWIFT( toofast ) =[];
+battery( toofast ) = [];
+
 % quality control with wind speed limit
 if length([SWIFT.time]) > 1,
     if isfield(SWIFT(1),'windspd')
         for si = 1:length(SWIFT),
-            if SWIFT(si).windspd > maxwindspd, % 1/12 of day is two hours
+            if SWIFT(si).windspd > maxwindspd
                 SWIFT(si).windspd = NaN;
                 SWIFT(si).winddirT = NaN;
                 SWIFT(si).winddirR = NaN;
@@ -288,6 +293,7 @@ if length([SWIFT.time]) > 1,
         end
     end
 end
+
 
 %% save
 %save([ flist(ai).name(6:13) '.mat'], 'SWIFT')

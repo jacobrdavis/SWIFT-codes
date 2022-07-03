@@ -259,7 +259,7 @@ spread2 = sqrt( abs( 0.5 - 0.5 .* ( a2.*cos(2.*dir2) + b2.*cos(2.*dir2) )  ));
 
 %% screen for presence/absence of vertical data
 if zdummy ==1,
-    Ezz(:) = 0;
+    Ezz(:) = 9999;
     a1(:) = 9999;
     b1(:) = 9999;
     dir1(:) = 9999;
@@ -305,7 +305,7 @@ drawnow
 %% wave stats
 fwaves = f>0.05 & f<1; % frequency cutoff for wave stats, 0.4 is specific to SWIFT hull
 
-%E( ~fwaves ) = 0;
+E( ~fwaves ) = 0;
 
 % significant wave height
 Hs  = 4*sqrt( sum( E(fwaves) ) * bandwidth);
@@ -316,8 +316,8 @@ fe = sum( f(fwaves).*E(fwaves) )./sum( E(fwaves) );
 Ta = 1./fe;
 
 % peak period
-[~ , fpindex] = max(UU+VV); % can use velocity (picks out more distint peak)
-%[~ , fpindex] = max(E);
+%[~ , fpindex] = max(UU+VV); % can use velocity (picks out more distint peak)
+[~ , fpindex] = max(E);
 Tp = 1./f(fpindex);
 
 if Tp > 18, % if peak not found, use centroid
@@ -371,7 +371,6 @@ end
 
 %% prune high frequency results
 E( f > maxf ) = [];
-Ezz( f > maxf ) = [];
 dir( f > maxf ) = [];
 spread( f > maxf ) = [];
 a1( f > maxf ) = [];

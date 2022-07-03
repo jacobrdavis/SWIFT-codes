@@ -42,7 +42,7 @@ function [ Hs, Tp, Dp, E, f, a1, b1, a2, b2, check ] = GPSandIMUwaves(u,v,az,pit
 %                           changes spectra parameters to report higher f
 %                               while keeping same # (=42) of frequencies
 %               12/2014, v5, fix directions by using cospectra of az and u v
-%                           (rather than quadspectrum, which is only appropriate for displacements                           directional estimate when not upright
+%                           (rather than quadspectrum, which is only appropriate for displacements                           
 %               12/2015, v6, remove the low-freq cutoff for spectra, but keep it for bulk stats
 %
 %               10/2017, v7, change the RC filter parameter to 3.5, after
@@ -79,7 +79,7 @@ maxf = .5;       % frequency cutoff for telemetry Hz
 if isempty(az),  % check for accelerations
     az = zeros(size(u));
     azdummy = 1;
-elseif abs( mean(az) - 1 ) > 0.1, % check that mean of vertical acceleration is close to 1 g (upside down IMU in SWIFT hull)
+elseif abs( abs(mean(az)) - 1 ) > 0.1, % check that mean of vertical acceleration is close to +/-1 g (upside down IMU in SWIFT hull)
     az = zeros(size(u));
     azdummy = 1;
 else
@@ -291,8 +291,10 @@ check = Ezz ./ (Eyy + Exx);
 
 %% Scalar energy spectra (a0)
 
-E = Exx + Eyy;
+E = Exx + Eyy; % use GPS for scalar spectra
+%E = Ezz; % use acceleration for scalar spectra
 
+% hybrid spectra
 %E = zeros(1,length(f));
 %if azdummy ==1,
 %    E = Exx + Eyy;
@@ -302,17 +304,9 @@ E = Exx + Eyy;
 %E(f<=fchange) = Ezz(f<=fchange); % use heave acceleratiosn for scalar energy of swell
 %end
 
-% testing bits
-%E = nanmean([Ezz' (Exx+Eyy)'],2)';
-%E = Eyy+Exx; % pure GPS version (for testing)
-%E( check > maxEratio | check < minEratio ) = 0; 
-%figure, loglog(f,check)
-%clf, loglog(f,UU+VV,'g',f,Exx+Eyy,'b',f,AZAZ.*9.8^2,'m',f,Ezz,'r'),legend('UU+VV','XX+YY','AZAZ','ZZ') % for testing
-%loglog(f,abs(Cxz),f,abs(Cyz))
-%drawnow
 
 %% wave stats
-fwaves = f>0.04 & f<1; % frequency cutoff for wave stats, 0.4 is specific to SWIFT hull
+fwaves = f>0.05 & f<1; % frequency cutoff for wave stats, 0.4 is specific to SWIFT hull
 
 E( ~fwaves ) = 0;
 
@@ -325,8 +319,8 @@ fe = sum( f(fwaves).*E(fwaves) )./sum( E(fwaves) );
 Ta = 1./fe;
 
 % peak period
-[~ , fpindex] = max(UU+VV); % can use velocity (picks out more distint peak)
-%[~ , fpindex] = max(E);
+%[~ , fpindex] = max(UU+VV); % can use velocity (picks out more distint peak)
+[~ , fpindex] = max(E);
 Tp = 1./f(fpindex);
 
 
@@ -403,10 +397,10 @@ end
 
 
 % quality control
-if Tp>20,   
-     Hs = 9999;
-     Tp = 9999; 
-     Dp = 9999; 
-else 
-end
+% if Tp>20,   
+%      Hs = 9999;
+%      Tp = 9999; 
+%      Dp = 9999; 
+% else 
+% end
 
