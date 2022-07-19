@@ -23,10 +23,9 @@ IMU.gyro = data.data(:,7:9);
 %% timestamps
 IMU.time= datenum(IMU.clock); % modified 12/2021
 
-
 %% plots
 
-save(filename(1:end-4),'IMU');
+% save(filename(1:end-4),'IMU');
 
 if plotflag, 
     

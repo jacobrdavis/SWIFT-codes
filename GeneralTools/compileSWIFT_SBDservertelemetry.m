@@ -84,7 +84,6 @@ for ai = 1:length(flist),
         oneSWIFT.time = NaN;
     end
     
-    
     %% remove bad Airmar data
     
     if isfield(oneSWIFT,'airtemp'),

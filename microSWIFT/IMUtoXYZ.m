@@ -1,4 +1,4 @@
-function [x, y, z, roll, pitch, yaw, heading] = IMUtoXYZ(ax, ay, az, gx, gy, gz, mx, my, mz, mxo, myo, mzo, Wd, fs );
+function [x, y, z, vx, vy, vz, roll, pitch, yaw, heading] = IMUtoXYZ(ax, ay, az, gx, gy, gz, mx, my, mz, mxo, myo, mzo, Wd, fs );
 %
 % Matlab function to calculate wave displacements in earth reference frame
 % from microSWIFT IMU measurements in body reference frame
@@ -174,6 +174,9 @@ z = RCfilter(z, RC, fs);
 
 
 %% remove first portion, which can has initial oscillations from filtering
+vx(1:round(RC./dt*10),:) = 0;
+vy(1:round(RC./dt*10),:) = 0;
+vz(1:round(RC./dt*10),:) = 0;
 
 x(1:round(RC./dt*10),:) = 0;
 y(1:round(RC./dt*10),:) = 0;

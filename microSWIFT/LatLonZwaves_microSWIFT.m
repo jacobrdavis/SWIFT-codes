@@ -1,4 +1,4 @@
-function [ Hs, Tp, Dp, E, f, a1, b1, a2, b2, check ] = XYZwaves(x,y,z,fs) 
+function [ Hs, Tp, Dp, E, f, a1, b1, a2, b2, check] = XYZwaves(x,y,z,fs) 
 
 % matlab function to read and process raw wave displacments
 %   to estimate wave height, period, direction, directional moments and
@@ -31,8 +31,9 @@ function [ Hs, Tp, Dp, E, f, a1, b1, a2, b2, check ] = XYZwaves(x,y,z,fs)
 
 %% fixed parameters
 wsecs = 256;   % window length in seconds, should make 2^N samples
+% wsecs = 128;   % window length in seconds, should make 2^N samples
 merge = 3;      % freq bands to merge, must be odd?
-maxf = .5;       % frequency cutoff for telemetry Hz
+maxf = 1;       % frequency cutoff for telemetry Hz
    
 
 %% begin processing, if data sufficient
@@ -139,6 +140,14 @@ XY = mean( XYwindowmerged.' ) / (w/2 * fs  );
 XZ = mean( XZwindowmerged.' ) / (w/2 * fs  ); 
 YZ = mean( YZwindowmerged.' ) / (w/2 * fs  ); 
 
+
+
+% figure
+% plot(f,ZZwindowmerged/(w/2*fs),'Color',0.90.*[1 1 1]); hold on
+% plot(f,ZZ)
+% set(gca, 'YScale', 'log')
+% set(gca, 'XScale', 'log')
+
 %% auto and cross displacement spectra 
 Exx = XX;  %[m^2/Hz]
 Eyy = YY;  %[m^2/Hz]
@@ -172,11 +181,12 @@ spread2 = sqrt( abs( 0.5 - 0.5 .* ( a2.*cos(2.*dir2) + b2.*cos(2.*dir2) )  ));
 
 
 %% bulk parameters
-E = Ezz;
+% E = Ezz; 
+E = Exx + Eyy;
 
-fwaves = f>0.05 & f<maxf; % frequency cutoff for wave stats, 0.4 is specific to SWIFT hull
+fwaves = f>0.04 & f<maxf; % frequency cutoff for wave stats, 0.4 is specific to SWIFT hull
 
-E( ~fwaves ) = 0;
+%E( ~fwaves ) = 0;
 
 % significant wave height
 Hs  = 4*sqrt( sum( E(fwaves) ) * bandwidth);
@@ -212,22 +222,22 @@ spread = 180 ./ 3.14 .* spread1;
 Dp = dir(fpindex); % dominant (peak) direction, use peak f
 
 
-%% screen for bad direction estimate, commented-out Jun 2022   
+%% screen for bad direction estimate,     
 
-% inds = fpindex + [-1:1]; % pick neighboring bands
-% if all(inds>0) & max(inds) <= length(dir), 
-%     
-%   dirnoise = std( dir(inds) );
-% 
-%   if dirnoise > 45 ,
-%       Dp = 9999;
-%   else
-%       Dp = Dp;
-%   end
-%   
-% else
-%     Dp =9999;
-% end
+inds = fpindex + [-1:1]; % pick neighboring bands
+if all(inds>0) & max(inds) <= length(dir), 
+    
+  dirnoise = std( dir(inds) );
+
+  if dirnoise > 45 ,
+      Dp = 9999;
+  else
+      Dp = Dp;
+  end
+  
+else
+    Dp =9999;
+end
 
 
 %% prune high frequency results
