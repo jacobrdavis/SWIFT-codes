@@ -36,7 +36,7 @@ function [GPS] = processmicroSWIFT_GPS(GPSfile)
 if exist('GPSfile','var') && isfile(GPSfile)
 
     % read raw GPS data 
-    [lat, lon, sog, cog, depth, time, z] = readNMEA(GPSfile);
+    [lat, lon, sog, cog, depth, time, z, gpsquality] = readNMEA(GPSfile);
     
     % assign to structure as column vector, trimming to the shortest field:
     shortest = min([length(sog),length(cog),length(z)]); % shortest field length
@@ -46,6 +46,7 @@ if exist('GPSfile','var') && isfile(GPSfile)
     GPS.cog  = transpose(cog(1:shortest));
     GPS.time = transpose(time(1:shortest));
     GPS.z    = transpose(z(1:shortest));
+
 
     % compute velocitites from speed and course over ground
     GPS.u = GPS.sog .* sind(GPS.cog);
@@ -58,12 +59,16 @@ if exist('GPSfile','var') && isfile(GPSfile)
     % approximate sample rate:
     GPS.samplingrate = length(GPS.time)./((max(GPS.time)-min(GPS.time))*24*3600); % Hz
 
+    % quality (added 2022-06-27)
+    % NOTE: need to comment out line 124 in readNMEA to avoid mixing with $GPRMC feed
+     GPS.quality = cell2mat(cellfun(@(X)str2num(X),gpsquality,'UniformOutput',false));
+
 %     % Record mean time of the current burst
 %     GPS.meanBurstTime = datetime(mean(GPS.time),'ConvertFrom','datenum');
 
 else % if conditions are not satisfied, report an empty structure (also useful for initialization)
     
-    GPS = struct('lat',[],'lon',[],'sog',[],'cog',[],'time',[],'z',[],'u',[],'v',[],'x',[],'y',[],'samplingrate',[]);
+    GPS = struct('lat',[],'lon',[],'sog',[],'cog',[],'time',[],'z',[],'u',[],'v',[],'x',[],'y',[],'samplingrate',[],'quality',[]);
 
 end
 

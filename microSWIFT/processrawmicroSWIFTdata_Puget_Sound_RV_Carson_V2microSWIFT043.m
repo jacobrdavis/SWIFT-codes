@@ -39,7 +39,7 @@ clear gi;
 % Methods
 % referenceFrame = 'body'; 
 
-referenceFrame = 'earth'; 
+referenceFrame = 'body'; 
 filterType = 'RC'; %'butterworth_dynamic'; %'butterworth_highpass'; %'RC_dynamic'; %'butterworth_highpass'
 detrendSignals = true; 
 
@@ -99,18 +99,22 @@ freqz(Num{:}, Den{:})
 
 bodeplot(Num{:},Den{:})
 
-
+Fs = IMU.samplingrate;                                          % Define Sampling Frequency
+Ts = 1/Fs;
+zeta = 1/sqrt(2);
+wc = 2*pi*0.05;
 sys = tf([1 0 0],...
-         [1 (4*zeta*wc) (2*wc^2 + 4*zeta^2*wc^2)  (4*zeta*wc^3) +wc^4])
+         [1 (4*zeta*wc) (2*wc^2 + 4*zeta^2*wc^2)  (4*zeta*wc^3) +wc^4]);
 
-sysd = c2d(sys,Ts)
+sysd = c2d(sys,Ts);
 
+figure
+h = bodeplot(sysd)
+setoptions(h,'FreqUnits','Hz')
 
-bodeplot(sysd)
+phat = filter(sysd.Numerator{:},sysd.Denominator{:},detrend(IMU.acc(:,1)))
 
-filtfilt(sysd.Numerator{:},sysd.Denominator{:},)
-
-phat = filtfilt(Num{:}, Den{:}, detrend(IMU.acc(:,1)));
+% phat = filtfilt(Num{:}, Den{:}, detrend(IMU.acc(:,1)));
 
 figure
 plot(IMU.time,phat)
@@ -268,6 +272,7 @@ ylabel('lat')
 daspect([1 1 1])
 
 methodNames = fields(mSWIFT).'; methodNames = methodNames(~contains(methodNames,'SWIFT'));
+methodNames = {'XYZwaves'}
 colors = [0.1 0.7 0.85; 0.83 0.14 0.14; 1.00 0.54 0.00; 0.47 0.25 0.80; 0.25 0.80 0.54];
 styles = {'-','--',':','-.'};
 
@@ -288,14 +293,14 @@ for m = 1:length(methodNames)
 
     end
 end
-legend(h, [methodNames,mSWIFTlabels]);
+h(end+1) =  plot(f,E,'DisplayName','Heave Estimator')
+legend(h, [methodNames,mSWIFTlabels,'Heave Estimator']);
 xlabel('frequency (Hz)')
 ylabel('Energy density (m^2/Hz)')
 set(gca,'YScale','log'); set(gca,'XScale','log')
 set(gca,'FontSize',14)
 
-<<<<<<< HEAD:microSWIFT/processrawmicroSWIFTdata_Puget_Sound_RV_Carson.asv
-=======
+
 
 f2 = figure; hold on
 subplot(2,1,1)

@@ -1,4 +1,4 @@
-function [ lat lon sog cog depth time altitude ] = readNMEA(filename);
+function [ lat lon sog cog depth time altitude gpsquality] = readNMEA(filename);
 % function to read NMEA data from SWIFTs and other platforms
 % return variables and automatically save mat file
 %

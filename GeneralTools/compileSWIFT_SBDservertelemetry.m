@@ -76,9 +76,9 @@ for ai = 1:length(flist),
     hr = flist(ai).name(nameoffset + [11:12]);
     minute = flist(ai).name(nameoffset + [13:14]);
     sec = flist(ai).name(nameoffset + [15:16]);
-    
+    disp(datetime(oneSWIFT.time,'ConvertFrom','datenum'))
     oneSWIFT.time = datenum([day ' ' month ' ' year ' ' hr ':' minute ':' sec]);
-    
+    disp(datetime(oneSWIFT.time,'ConvertFrom','datenum'))
     
     %     if isempty(oneSWIFT.time),
     %         oneSWIFT.time = datenum([day ' ' month ' ' year ' ' hr ':' minute ':' sec]);

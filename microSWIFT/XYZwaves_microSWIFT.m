@@ -33,7 +33,7 @@ function [ Hs, Tp, Dp, E, f, a1, b1, a2, b2, check] = XYZwaves(x,y,z,fs)
 wsecs = 256;   % window length in seconds, should make 2^N samples
 % wsecs = 128;   % window length in seconds, should make 2^N samples
 merge = 3;      % freq bands to merge, must be odd?
-maxf = 1;       % frequency cutoff for telemetry Hz
+maxf = 6;       % frequency cutoff for telemetry Hz
    
 
 %% begin processing, if data sufficient

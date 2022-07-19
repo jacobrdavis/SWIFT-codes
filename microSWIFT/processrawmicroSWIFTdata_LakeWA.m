@@ -107,6 +107,23 @@ legend({'microSWIFT042 (12Hz, foam','microSWIFT066 (48Hz, foam'})
 xlabel('time (s)'); ylabel('pos z'); title('phase shifted')
 set(gca,'FontSize',14)
 
+% plot 7 GPS time series
+% GPS
+i=3
+figure
+plot(datetime(GPS(i).time,'ConvertFrom','datenum'),GPS(i).v,'.')
+GPSt = datetime(GPS(i).time,'ConvertFrom','datenum');
+title('microSWIFT 043 (1L) in Lake WA')
+ylabel('GPS u (m/s)')
+ylim([-1 1])
+xlim([GPSt(1) GPSt(end)])
+xline(GPSt(1:100))
+figure
+hist(milliseconds(diff(GPSt)))
+xlabel('dt (ms)')
+ylabel('count')
+
+
 %% trim IMU signal
 for i = [1,2,4] %1:length(IMU) 
     signalLength = length(IMU(i).time);
