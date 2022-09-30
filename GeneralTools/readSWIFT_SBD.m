@@ -60,6 +60,8 @@ function [SWIFT BatteryVoltage ] = readSWIFT_SBD( fname , plotflag );
 %
 %   J. Thomson 7/2022   add radiometer (CT15) payload type (14)
 %
+%   J. Thomson, 9/2022  add compact microSWIFT payload type (52), credit Jake Davis
+%
 
 recip = true; % binary flag to change wave direction to FROM
 
@@ -71,7 +73,7 @@ PBlon = NaN;
 
 fid = fopen(fname); % open file for reading
 BatteryVoltage = NaN; % placeholder
-SWIFTversion = []; % placeholder
+SWIFTversion = NaN; % placeholder
 
 %% SWIFT id flag from file name
 % note that all telemetry files from server start with 5 char 'buoy-'
@@ -222,12 +224,16 @@ while 1
         SWIFT.salinity(CTcounter + 1) = fread(fid,1,'float'); %
         CTcounter = CTcounter + 1;
         
-        if CTcounter == 1 %add field for CT depths (temp and sal), meters
-            SWIFT.CTdepth(1) = .18;
-        elseif CTcounter == 2
-            SWIFT.CTdepth(2) = .66;
-        elseif CTcounter == 3
-            SWIFT.CTdepth(3) = 1.22;
+        if port==7
+           SWIFT.CTdepth(CTcounter) =.18;
+        elseif port==8 && SWIFTversion == 3
+            SWIFT.CTdepth(CTcounter) = .66;
+        elseif port==8 && SWIFTversion == 4
+            SWIFT.CTdepth(CTcounter) = .2;
+        elseif port==9
+            SWIFT.CTdepth(CTcounter) = 1.22;
+        else
+            SWIFT.CTdepth(CTcounter) = 0.66;
         end
         
         
@@ -425,39 +431,64 @@ while 1
         SWIFT.time = datenum( year, month, day, hour, minute, second); % time at end of burst
         
     elseif type == 52 & size > 0, % microSWIFT, size should be 327 bytes
-        disp('reading microSWIFT 52')
-        SWIFT.sigwaveheight = fread(fid,1,'float'); % sig wave height
-        SWIFT.peakwaveperiod = fread(fid,1,'float'); % dominant period
-        SWIFT.peakwavedirT = fread(fid,1,'float'); % dominant wave direction
-        SWIFT.wavespectra.energy = fread(fid,42,'float'); % spectral energy density of sea surface elevation
-        fmin = fread(fid,1,'float'); % min frequency
-        fmax = fread(fid,1,'float'); % max frequency
-        df = fread(fid,1,'float'); % frequency resolution
-        SWIFT.wavespectra.freq = [fmin:df:fmax]; % frequency (should be 1x42)
-        SWIFT.wavespectra.a1 =  NaN(1,42);
-        SWIFT.wavespectra.b1 = NaN(1,42);
-        SWIFT.wavespectra.a2 = NaN(1,42);
-        SWIFT.wavespectra.b2 = NaN(1,42);
-        SWIFT.wavespectra.check = NaN(1,42);
-        SWIFT.lat = fread(fid,1,'float'); % Latitude
-        SWIFT.lon = fread(fid,1,'float'); % Longitude
-        SWIFT.watertemp = fread(fid,1,'float'); % water temp
-        BatteryVoltage = fread(fid,1,'float'); % battery level
-        meanu = fread(fid,1,'float'); % east component speed
-        meanv = fread(fid,1,'float'); % north component speed
-        driftdir = atan2d(meanu, meanv);
-        if driftdir < 0, driftdir = 360+driftdir; end
-        SWIFT.driftdirT = driftdir;
-        SWIFT.driftspd = ( meanu.^2 + meanv.^2 ) .^.5;
-        meanz = fread(fid,1,'float'); % altitude
-        year = fread(fid,1,'uint32'); % year
-        month = fread(fid,1,'uint32'); % month
-        day = fread(fid,1,'uint32'); % day
-        hour = fread(fid,1,'uint32'); % hour
-        minute = fread(fid,1,'uint32'); % minute
-        second = fread(fid,1,'uint32'); % seconds
-        SWIFT.time = datenum( year, month, day, hour, minute, second); % time at end of burst
-        
+%         disp('reading microSWIFT 52')
+%         SWIFT.sigwaveheight = fread(fid,1,'float'); % sig wave height
+%         SWIFT.peakwaveperiod = fread(fid,1,'float'); % dominant period
+%         SWIFT.peakwavedirT = fread(fid,1,'float'); % dominant wave direction
+%         SWIFT.wavespectra.energy = fread(fid,42,'float'); % spectral energy density of sea surface elevation
+%         fmin = fread(fid,1,'float'); % min frequency
+%         fmax = fread(fid,1,'float'); % max frequency
+%         df = fread(fid,1,'float'); % frequency resolution
+%         SWIFT.wavespectra.freq = [fmin:df:fmax]; % frequency (should be 1x42)
+%         SWIFT.wavespectra.a1 =  NaN(1,42);
+%         SWIFT.wavespectra.b1 = NaN(1,42);
+%         SWIFT.wavespectra.a2 = NaN(1,42);
+%         SWIFT.wavespectra.b2 = NaN(1,42);
+%         SWIFT.wavespectra.check = NaN(1,42);
+%         SWIFT.lat = fread(fid,1,'float'); % Latitude
+%         SWIFT.lon = fread(fid,1,'float'); % Longitude
+%         SWIFT.watertemp = fread(fid,1,'float'); % water temp
+%         BatteryVoltage = fread(fid,1,'float'); % battery level
+%         meanu = fread(fid,1,'float'); % east component speed
+%         meanv = fread(fid,1,'float'); % north component speed
+%         driftdir = atan2d(meanu, meanv);
+%         if driftdir < 0, driftdir = 360+driftdir; end
+%         SWIFT.driftdirT = driftdir;
+%         SWIFT.driftspd = ( meanu.^2 + meanv.^2 ) .^.5;
+%         meanz = fread(fid,1,'float'); % altitude
+%         year = fread(fid,1,'uint32'); % year
+%         month = fread(fid,1,'uint32'); % month
+%         day = fread(fid,1,'uint32'); % day
+%         hour = fread(fid,1,'uint32'); % hour
+%         minute = fread(fid,1,'uint32'); % minute
+%         second = fread(fid,1,'uint32'); % seconds
+%         SWIFT.time = datenum( year, month, day, hour, minute, second); % time at end of burst
+     
+        disp('reading microSWIFT (compact)')
+
+        SWIFT.sigwaveheight      = half.typecast(fread(fid, 1,'*uint16')).double; % sig wave height
+        SWIFT.peakwaveperiod     = half.typecast(fread(fid, 1,'*uint16')).double; % dominant period
+        SWIFT.peakwavedirT       = half.typecast(fread(fid, 1,'*uint16')).double; % dominant wave direction
+        SWIFT.wavespectra.energy = half.typecast(fread(fid,42,'*uint16')).double; % spectral energy density of sea surface elevation
+        fmin                     = half.typecast(fread(fid, 1,'*uint16')).double; 
+        fmax                     = half.typecast(fread(fid, 1,'*uint16')).double; 
+        fstep                    = (fmax - fmin) / (length(SWIFT.wavespectra.energy)- 1);
+        SWIFT.wavespectra.freq   = fmin:fstep:fmax; % frequency
+        SWIFT.wavespectra.a1     = double(fread(fid,42,'*int8'))/100; % spectral moment
+        SWIFT.wavespectra.b1     = double(fread(fid,42,'*int8'))/100; % spectral moment
+        SWIFT.wavespectra.a2     = double(fread(fid,42,'*int8'))/100; % spectral moment
+        SWIFT.wavespectra.b2     = double(fread(fid,42,'*int8'))/100; % spectral moment
+        SWIFT.wavespectra.check  = double(fread(fid,42,'*uint8'))/10; % spectral check factor (should be unity)
+        SWIFT.lat                = fread(fid, 1,'float'); % Latitude
+        SWIFT.lon                = fread(fid, 1,'float'); % Longitude
+        SWIFT.watertemp          = half.typecast(fread(fid, 1,'*uint16')).double; % water temp
+        SWIFT.salinity           = half.typecast(fread(fid, 1,'*uint16')).double; % salinity
+        SWIFT.CTdepth            = 0.5; % meters
+        BatteryVoltage           = half.typecast(fread(fid, 1,'*uint16')).double; % battery level
+        epochTime                = fread(fid, 1,'float'); % epoch time
+        asDatetime               = datetime(epochTime, 'ConvertFrom', 'posixtime', 'TimeZone','UTC');
+        SWIFT.time               = datenum(asDatetime); % time at end of burst
+
     else
         
     end
@@ -512,18 +543,16 @@ if isfield(SWIFT,'windspectra'),
 else
 end
 
-%% fix CTdepth field if 1 or 2 values
+%% sort CTdepth field 
 if isfield(SWIFT,'CTdepth')
-    if length(SWIFT.CTdepth) == 1
-        if SWIFTversion == 3 %v3, uses IMU waves
-            SWIFT.CTdepth = .66;
-        elseif SWIFTversion == 4 %v4, uses SBG waves
-            SWIFT.CTdepth = .18;
-        else
-            SWIFT.CTdepth = nan;
+    if length(SWIFT.CTdepth) > 1
+        for si=1:length(SWIFT)
+            [~, sorti] = sort(SWIFT(si).CTdepth); 
+            SWIFT(si).watertemp = SWIFT(si).watertemp(sorti);
+            SWIFT(si).salinity= SWIFT(si).salinity(sorti);
+            SWIFT(si).CTdepth = SWIFT(si).CTdepth(sorti);
         end
-    elseif length(SWIFT.CTdepth) == 2
-        SWIFT.CTdepth = [0.66; 1.22;]; % salty SWIFT with uppermost CT removed
+    else
     end
 end
 

@@ -21,8 +21,8 @@
 clear all,
 
 plotflag = 1;  % binary flag for plotting (compiled plots, not individual plots... that flag is in the readSWIFT_SBD call)
-fixspectra = false; % binary flag to redact low freq wave spectra
-                    % note this also recalcs wave heights
+fixspectra = false; % binary flag to redact low freq wave spectra, note this also recalcs wave heights
+micro = false; 
 
 minwaveheight = 0; % minimum wave height in data screening
 
@@ -77,7 +77,8 @@ for ai = 1:length(flist),
 
     elseif flist(ai).name(6)=='m', % microSWIFT
         nameoffset = 20;
-        % use the time embedded within the payload 50 or 51 of the SBD file
+        micro = true;
+        % use the time embedded within the payload 50 or 51 or 52 of the SBD file
         % which is the time at the end of the burst of raw data
     else
         nameoffset = 0;
@@ -159,28 +160,28 @@ for ai = 1:length(flist),
     %% screen the bad data (usually out of the water)
     
     % no data
-    if isempty(oneSWIFT.lon) | isempty(oneSWIFT.lat) | isempty(oneSWIFT.time),
+    if isempty(oneSWIFT.lon) || isempty(oneSWIFT.lat) || isempty(oneSWIFT.time)
         badburst(ai) = true;
         disp('=================================')
         disp('no position or timestamp!')
     end
     % no position
-    if oneSWIFT.lon == 0 | ~isnumeric(oneSWIFT.lon),
+    if oneSWIFT.lon == 0 | ~isnumeric(oneSWIFT.lon)
         badburst(ai) = true;
         disp('=================================')
         disp('no position!')
     end
     % wave limit
-    if isfield(oneSWIFT,'sigwaveheight'),
-        if oneSWIFT.sigwaveheight < minwaveheight,
+    if isfield(oneSWIFT,'sigwaveheight')
+        if oneSWIFT.sigwaveheight < minwaveheight || oneSWIFT.sigwaveheight >= 999
             badburst(ai) = true;
             disp('=================================')
             disp('waves too small, removing burst')
         end
     end
     % salinity limit
-    if isfield(oneSWIFT,'salinity'),
-        if all(oneSWIFT.salinity < minsalinity), % & all(~isnan(oneSWIFT.salinity)),
+    if isfield(oneSWIFT,'salinity') && ~micro
+        if all(oneSWIFT.salinity < minsalinity) % & all(~isnan(oneSWIFT.salinity)),
             badburst(ai) = true;
             disp('=================================')
             disp('salinity too low, removing burst')
@@ -213,6 +214,16 @@ battery(badburst) = [];
 SWIFT = SWIFT(tinds);
 battery = battery(tinds);
 
+%% look for outliers of position
+[cleanlon cloni] = filloutliers([SWIFT.lon],'linear');
+[cleanlat clati] = filloutliers([SWIFT.lat],'linear');
+if cloni == clati, 
+    for ci = find(cloni)
+        SWIFT(ci).lon = cleanlon(ci);
+        SWIFT(ci).lat = cleanlat(ci);
+    end
+    disp([num2str(sum(cloni)) ' positions filled that were outliers'])
+end
 
 %% calc drift (note that wind slip, which is 1%, is not removed)
 % drift speed is included from the Airmar results, 
@@ -234,14 +245,14 @@ if length(SWIFT) > 3 %&& ~isfield(SWIFT,'driftspd')
     direction = -180 ./ 3.14 .* atan2(dydt,dxdt); % cartesian direction [deg]
     direction = direction + 90;  % rotate from eastward = 0 to northward  = 0
     direction( direction<0) = direction( direction<0 ) + 360; %make quadrant II 270->360 instead of -90->0
-    
+
     for si = 1:length(SWIFT),
         if si == 1 | si == length(SWIFT),
             SWIFT(si).driftspd = NaN;
             SWIFT(si).driftdirT = NaN;
         else
-            SWIFT(si).driftspd = speed(si);%speed(tinds(ai));
-            SWIFT(si).driftdirT = direction(si);%dir(tinds(ai));
+            SWIFT(si).driftspd = speed(si);
+            SWIFT(si).driftdirT = direction(si);
         end
     end
     
@@ -276,9 +287,11 @@ else
 end
 
 % quality control drift speeds too fast (prob on deck) with new drift spd
-toofast = [SWIFT.driftspd] > maxdriftspd;
-SWIFT( toofast ) =[];
-battery( toofast ) = [];
+if isfield(SWIFT(1),'driftspd')
+    toofast = [SWIFT.driftspd] > maxdriftspd;
+    SWIFT( toofast ) =[];
+    battery( toofast ) = [];
+end
 
 % quality control with wind speed limit
 if length([SWIFT.time]) > 1,
@@ -293,10 +306,25 @@ if length([SWIFT.time]) > 1,
     end
 end
 
+%% sort the microSWIFT processing
+IMU = find(battery==0);
+GPS = find(battery==1);
+
+%% sort the microSWIFT processing
+IMU = find(battery==0);  SWIFT_IMU = SWIFT(IMU);
+GPS = find(battery==1);  SWIFT_GPS = SWIFT(GPS);
+
 
 %% save
 %save([ flist(ai).name(6:13) '.mat'], 'SWIFT')
-save([ wd '.mat'], 'SWIFT')
+%save([ wd '.mat'], 'SWIFT')
+if micro
+    save(['microSWIFT' SWIFT(1).ID '_telemetry.mat'],'SWIFT*')
+else
+    save(['SWIFT' SWIFT(1).ID '_telemetry.mat'],'SWIFT')
+end
+
+
 
 %% ploting
 
