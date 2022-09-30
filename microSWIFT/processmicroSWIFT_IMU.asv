@@ -89,9 +89,8 @@ if exist('IMUfile','var') && ~isempty(IMUfile) && isfile(IMUfile) % && IMUfile.b
             fc = [];
         end
 
-        disp(['start: ' datestr(datetime(IMU.time(1),'ConvertFrom','datenum'))]); 
-        disp(['end: ' datestr(datetime(IMU.time(end),'ConvertFrom','datenum'))]); 
-        
+        disp('start:' ) datetime(IMU.time(1),'ConvertFrom','datenum'); 
+
         disp('acc:')
         mean(IMU.acc(:,:))
         var(IMU.acc(:,:))  

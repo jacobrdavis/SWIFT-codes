@@ -144,12 +144,12 @@ figure(3), clf
 %subplot(2,1,2)
 %pcolor(f,theta,log10(Etheta')), shading flat;
 if iscolumn(f),
-    [h,c] = polarPcolorV3(f',theta(1:180),log10(Etheta(:,1:180)'),'colBar',true,'colormap',getPyPlot_cMap('RdGy_r'));
+    
+    [h,c] = polarPcolorV3(f',theta(1:180),log10(Etheta(:,1:180)'),'colBar',true,'colormap',brewermap([],'-RdGy'));
     set(get(c,'Label'),'string','Energy (m^2s)');
     set(gca,'FontSize',18)
     ticklabels = cellfun(@(x) ['10^{',x,'}'],c.TickLabels,'UniformOutput',false);
     set(c,'TickLabels',ticklabels)
-
    ;
 elseif isrow(f), 
     polarPcolor(f,theta(1:180),log10(Etheta(:,1:180)'));
@@ -160,10 +160,9 @@ end
 %xlabel('freq [Hz]')
 %colorbar('peer',gca,'west')
 %legend('log_{10} (E)')
-title([ wd ', Hs = ' num2str(Hs,2) ' m'],'interpreter','none')
+title([SWIFT.ID,' ' datestr(SWIFT.time,'yyyy-mm-dd HH:MMZ'),'; Hs = ' num2str(Hs,2) ' m' newline()],'interpreter','none','FontSize',14)
 
-
-print('-dpng',[ wd '_directionalspectra.png'])
+print('-dpng',[wd, '_',SWIFT.ID,'_',datestr(SWIFT.time,'yyyy-mm-dd_HHMMZ'),'_directionalspectra.png'])
 %print('-dpng',['SWIFT_dirwavespectra_' datestr(mean([SWIFT.time]),1) '.png'])
 
 %% debugging plots
@@ -197,8 +196,8 @@ set(gca,'ylim',[-1 1])
 xlabel('Frequency [Hz]')
 ylabel('Moments []')
 
-print('-dpng',[ wd '_directionalmoments.png'])
-
+% print('-dpng',[ wd '_directionalmoments.png'])
+print('-dpng',[wd, '_',SWIFT.ID,'_',datestr(SWIFT.time,'yyyy-mm-dd_HHMMZ'),'_directionalmoments.png'])
 
 %% distributions at freqs
 
@@ -219,8 +218,8 @@ for fi=1:n,
     ylabel('E')
 end
 
-print('-dpng',[ wd '_directiondistributions.png'])
-
+% print('-dpng',[ wd '_directiondistributions.png'])
+print('-dpng',[wd, '_',SWIFT.ID,'_',datestr(SWIFT.time,'yyyy-mm-dd_HHMMZ'),'_directionaldistributions.png'])
 
 else 
 end

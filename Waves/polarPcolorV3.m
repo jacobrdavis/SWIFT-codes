@@ -165,7 +165,7 @@ end
 if colBar==1,
     c =colorbar('location','WestOutside');
     caxis([quantile(Z(:),0.01),quantile(Z(:),0.99)])
-    caxis([-5 0])
+    caxis([-5 -2]) %***
 else
     c = [];
 end
@@ -300,7 +300,7 @@ end
                 (contourD(kk)).*sind(position),...
                 rtick,'verticalalignment','BaseLine',...
                 'horizontalAlignment', 'right',...
-                'handlevisibility','off','parent',cax);
+                'handlevisibility','off','parent',cax,'Color','b');
             if min(round(abs(90-theta)))<5 && strcmpi(typeRose,'default'),
                 t.Position =  t.Position - [0,0.1,0];
                 t.Interpreter = 'latex';
